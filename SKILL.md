@@ -13,7 +13,7 @@ description: >
 license: MIT
 metadata:
   author: Indigo Karasu (indigokarasu)
-  version: "3.0.0"
+  version: "3.1.1"
   merged-from: ocas-critique
 includes:
   - references/**
@@ -69,6 +69,8 @@ Available actions:
 9. **Exit** — close the menu
 
 After the user selects an action, execute it, then present the menu again. Loop until the user chooses Exit or sends `/stop`.
+
+See `references/clarify-interactive-menu.md` for the full clarify-based menu pattern (basic menu loop, sub-menus, dynamic choices, confirmation dialogs, pitfalls).
 
 ## Table of Contents
 
@@ -187,7 +189,7 @@ Use `references/critique-issue-categorization.md` for full rules.
 
 **Phase 4 — Plan:** For each issue, document: Location, Current state, Fix, Impact (+N points). Group: Critical → Major → Minor. Use `references/critique-improvement-plan-template.md`.
 
-**Phase 5 — Execute:** Critical → fix immediately. Major → fix unless documented deferral. Minor → evaluate with 3 questions (genuine improvement? false positive? helps the agent?), then apply if all pass. Use `patch` for targeted edits. Verify syntax after each change.
+**Phase 5 — Execute:** Critical → fix immediately. Major → fix unless documented deferral. Minor → evaluate with 3 questions (genuine improvement? false positive? helps the agent?), then apply if all pass. Use `patch` for targeted edits. Verify syntax after each change. **Full-file rewrite strategy:** When extracting multiple inline sections to references in one pass (3+ sections or >50 lines moved), prefer a `write_file` rewrite of the entire SKILL.md over sequential `patch` calls. Sequential patches cause line-number drift, eaten headings, and duplicate sections — always `grep -n '^## '` after structural patches. When moving code blocks to reference files, scan for absolute paths (`/root/`, `/home/`, `/etc/`) and replace with `{agent_root}/`. Verify cross-skill paths exist before embedding them.
 
 **Phase 6 — Verify:** Re-read modified SKILL.md. Re-score affected dimensions. Confirm all Critical/Major resolved. Print before/after comparison. Run quick checklist at `references/critique-audit-checklist.md`.
 
@@ -321,7 +323,15 @@ Remove inline credential references from SKILL.md files by extracting secrets in
 **Leave inline:** Public service URLs, generic config keys without values, standard library package names, template variables like `{agent_root}`.
 
 ### Sanitize Steps
-1. **Scan** — search for env vars ending in `_KEY`, `_SECRET`, `TOKEN`, OAuth fields, absolute paths
+1. **Scan** — search for env vars ending in `_KEY`, `_SECRET`, `T# Skill Lab Scripts
+
+Scripts for skill library maintenance: audit, critique, merge, sanitize.
+
+| Script | Purpose |
+|---|---|
+| `scripts/skilllab.py` | Interactive skill library shell — audit, critique, merge, rename, delete, publish, sanitize |
+| `scripts/critique_code_ratio.py` | Measure code-to-prose ratio in a SKILL.md file |
+| `scripts/critique_10khr_runner.py` | Heuristic batch scorer for 10khr autonomous grinding (over-scores by 6-10pt) |EN`, OAuth fields, absolute paths
 2. **Create reference file** — `references/<purpose>.md` with all credential details verbatim
 3. **Replace inline** — collapse credential sections to `See references/<file>.md for <description>.`
 4. **Check secondary locations** — Gotchas section, support file maps
@@ -381,6 +391,13 @@ triggers:
 - **Don't grep for author: with line-level tools:** Use a YAML parser. grep false-positives on "authorization", "authoritative", etc.
 - **MemPalace kg_add rejects special characters:** `@`, `/`, `.`, commas in object/subject fields cause silent failures. Sanitize strings before calling, or use `mempalace_add_drawer` for structured/profile data. See `references/mempalace-gotchas.md`.
 - **Renaming skills requires gateway restart:** After renaming a skill directory, the old name persists in Hermes's `/` autocomplete and injected SKILL.md until you: (1) update all references in the skill body text, (2) clear `.skills_prompt_snapshot.json`, (3) restart the gateway via `hermes gateway restart`. Doing only #1 without #3 leaves stale autocomplete entries.
+- **Skill directory name must match frontmatter `name:` field.** If a skill directory is renamed (e.g., `ocas-corvus` → `ocas-corvus-disabled`), the skill system cannot find it — `skills_list` and `skill_view` match on directory name, not frontmatter content. Cron jobs that reference the skill by name will silently fail to load it. Before renaming a skill directory, check all cron jobs, references, and the `.skills_prompt_snapshot.json` cache. To disable a skill without breaking references, keep the directory name intact and add a `status: disabled` field to frontmatter instead of renaming the directory.
+- **Git merge conflict markers in skill files.** When a skill is synced from GitHub via `git pull` or `git merge` and there's a conflict, the file will contain unresolved markers (`<<<<<<< HEAD`, `=======`, `>>>>>>>`). These break YAML frontmatter parsing, making the skill invisible to `skills_list`/`skill_view`. During audit, check for these markers with `grep -r '<<<<<<<' <skills_dir> --include="*.md"`. To resolve: read both sides, pick the newer/more-complete version (usually "theirs"), and write the resolved file with `write_file`. The indigo profile copy and default profile copy may diverge — check both locations.
+- **Section renumbering after insertion:** When inserting a new section (e.g., during a merge), ALL downstream section numbers and TOC entries must be incremented. Use `grep -n '^## '` to verify numbering is contiguous after any structural insert. Missing this causes broken TOC links and duplicate section numbers.
+- **Interactive menu 4-choice limit:** The `clarify` tool supports max 4 visible choices (5th is always "Other"). For skills with >4 operations, either chunk into categories (first clarify picks category, second picks action) or list all operations in the menu text and use the first 4 as the most common, with "Other" capturing the rest. The menu text should list ALL operations for agent reference regardless of the 4-choice UI limit.
+- **Always update at least one skill per session**: After any non-trivial session, look for at least one skill to update. "Nothing to save" is the exception, not the rule. Signals: user corrected style/tone/workflow, new technique discovered, loaded skill was wrong/missing steps, tool-usage pattern emerged.
+- **Sequential patch fragility during bulk extraction:** When moving multiple inline sections to `references/` in one pass, sequential `patch` calls corrupt the file (eaten headings, duplicates, line-number drift). Prefer a full-file `write_file` rewrite. Always `grep -n '^## '` after structural patches. Scan moved code for absolute paths (`/root/` → `{agent_root}/`) and verify cross-skill path existence.
+- **Reference file path convention:** Design references live at `~/.hermes/references/design/`. If you find design refs at old paths like `/root/references/creative/`, migrate them to the design directory and update all pointers.
 
 ---
 
@@ -414,6 +431,7 @@ When a capability is retired (archived, superseded, or removed), sweep all refer
 | `references/skill-publish-agentskill-evaluation-criteria.md` | When evaluating skill quality/security scores |
 | `references/skill-sanitize-checklist.md` | Post-sanitize verification checklist + scanner false-positives |
 | `references/mempalace-gotchas.md` | MemPalace MCP tool constraints — kg_add character rejections, drawer vs. KG guidance |
+| `references/audit-2026-06-05.md` | June 2026 audit — git merge conflict repair, cross-profile write guard, remaining author gaps |
 | `references/critique-rubric.md` | During Phase 2 scoring — full 10-dimension rubric |
 | `references/critique-issue-categorization.md` | During Phase 3 — Critical/Major/Minor rules |
 | `references/critique-assessment-mode.md` | Before assessment — decision table for assess vs. fix |
@@ -425,7 +443,8 @@ When a capability is retired (archived, superseded, or removed), sweep all refer
 | `references/critique-inline-to-refs-pattern.md` | Before Phase 5 — moving inline content to references |
 | `references/critique-agentic-script-pattern.md` | During D9 assessment — checklist for script quality |
 | `references/critique-agentskill-scanner-guide.md` | After manual review — scanner false positives |
-| `references/critique-patch-tool-frontmatter-gotchas.md` | Before Phase 5 — patch tool pitfalls for YAML |
+| `references/design-library.md` | When building any UI — design reference library (glitch aesthetic, DESIGN.md spec, 72 brand systems, 67 styles, 200 iOS apps, taste-skill anti-slop enforcement), usage guide, refresh commands |
+| `~/.hermes/profiles/indigo/skills/responsive-design/references/` | Responsive CSS — container queries, fluid typography, Grid/Flexbox, breakpoints, responsive nav/images/tables (wshobson) |
 | `references/critique-10khr-learnings.md` | During 10khr — accumulated grinding patterns |
 | `references/critique-10khr-may-2026-batch.md` | During batch critique — scoring insights, fix frequency table |
 | `references/critique-10khr-may-2026-learnings.md` | After May 2026 batch — reusable fix patterns |
@@ -435,5 +454,6 @@ When a capability is retired (archived, superseded, or removed), sweep all refer
 | `references/critique-10khr-2026-05-30.md` | May 30 session log — historical reference |
 | `references/critique-10khr-2026-05-30-r2.md` | May 30 session round 2 — historical reference |
 | `references/critique-10khr-2026-05-30-learnings.md` | After May 30 session — distilled patterns |
+| `references/design-library.md` | When building any UI — design reference library (glitch aesthetic, DESIGN.md spec, 72 brand systems, 67 styles, 200 iOS apps, taste-skill anti-slop enforcement), usage guide, refresh commands |
 | `scripts/critique_code_ratio.py` | During Phase 2 — code ratio measurement |
 | `scripts/critique_10khr_runner.py` | During 10khr — heuristic scoring and targeting (over-scores by 6-10pt) |
