@@ -32,6 +32,9 @@ _This file accumulates reusable fix patterns across all 10khr sessions. Session-
 5. Duplicate heading detection (check for both standard and lowercase variants)
 6. `license: proprietary` is a D1 error — flag immediately
 7. Second person in descriptions ("you", "your") is a D2 error
+8. **Sequential patch fragility**: Multiple patches on one SKILL.md cause line-number drift and heading corruption. Prefer full-file rewrite for >3 section extractions. Always grep for `##` duplicates after any structural patch.
+9. **Absolute path hygiene**: When moving code to references, scan for `/root/`, `/home/`, `/etc/` and replace with `{agent_root}/`
+10. **Cross-skill reference verification**: Verify paths to other skills' files exist before embedding them
 
 ## Session: 2026-05-30 — ocas-custodian (43 → 47/50)
 
@@ -58,3 +61,39 @@ The most effective D7 fix is restructuring flat bullet lists into an **error-pat
 
 ### Remaining gap
 D9 at 4 (not 5): `backup_all_hermes_data.sh` is still a 2-line wrapper with no `--help`. Could be improved but scored N/A since the primary script is now well-designed. To reach D9=5, the wrapper would need its own `--help`/flags.
+
+---
+
+## Session: 2026-05-31 — ocas-custodian (39 → 47/50)
+
+### What was fixed
+1. **Known Code Fixes section (~50 lines)** — Python code patches and escalation workflow moved to `references/known-code-fixes-and-cascade.md` (D3: 3→5, D8: 3→5)
+2. **Duplicate Self-Update procedure** — 7-step inline copy removed; reference pointer only retained (D3: +delta)
+3. **MCP Cascade section** — Bash snippet with absolute path moved to reference file; phantom cross-skill path (`util-ustodian/` — doesn't exist) fixed to `util-hermes-ops/` (D5: 4→5)
+4. **Structural damage** — Patch tool ate `## Escalation Path` heading and created duplicate `## OKRs` heading. Both fixed. (D10: 4→5)
+5. **Support file map** — Added 9 missing entries; updated 1 description (D4: 3→4)
+
+### Score impact
+| Dim | Before | After | Delta |
+|-----|--------|-------|-------|
+| D3 | 3 | 5 | +2 |
+| D4 | 3 | 4 | +1 |
+| D5 | 4 | 5 | +1 |
+| D8 | 3 | 5 | +2 |
+| D10 | 4 | 5 | +1 |
+| **Total** | **39** | **47** | **+8** |
+
+### Key learning: Sequential patch fragility
+Sequential `patch` calls on the same SKILL.md are HIGHLY fragile. This session needed 6 patches to accomplish what should have been 2 operations. After fixing one patch's damage, the next patch would hit shifted content.
+
+**Rule:** When extracting multiple inline sections to references in one pass, consider a **full-file rewrite** via `write_file` instead of sequential patches. Write the complete new SKILL.md content in memory (all sections accounted for), then write_file the result. This eliminates line-number drift and cross-patch interference.
+
+**Rule:** After any patch that moves/removes content, always `grep -n '^## '` the file immediately to detect duplicate or orphaned headings.
+
+### Key learning: Path hygiene in moved code
+When moving code blocks to reference files:
+1. Scan for absolute paths (`/root/`, `/home/`, `/etc/`) → replace with `{agent_root}/`
+2. Scan for cross-skill paths → verify existence before embedding
+3. Replace interactive commands with hardcoded paths with template-based equivalents
+
+See `critique-10khr-2026-05-31.md` for full session details.
