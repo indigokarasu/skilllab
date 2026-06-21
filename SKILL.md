@@ -1,5 +1,5 @@
 ---
-name: skilllab
+name: ocas-skilllab
 description: >
   Skill library maintenance: audit, merge, rename, delete, consolidate, publish,
   sanitize, and critique skills. Interactive menu via clarify tool.
@@ -13,8 +13,9 @@ description: >
 license: MIT
 metadata:
   author: Indigo Karasu (indigokarasu)
-  version: "3.1.1"
+  version: "3.1.5"
   merged-from: ocas-critique
+source: https://github.com/indigokarasu/skilllab
 includes:
   - references/**
   - scripts/**
@@ -125,7 +126,7 @@ Check TWO places: top-level `author:` and nested `metadata.author:`.
 
 ### Check for Auto-Generated Skills
 ```bash
-grep -r "generated_by" ~/.hermes/skills/
+grep -r "generated_by" ~/.hermes/skills/ ~/.hermes/profiles/indigo/skills/ --include="*.md" -l 2>/dev/null
 ```
 
 ### Check for Author Coverage
@@ -133,18 +134,84 @@ grep -r "generated_by" ~/.hermes/skills/
 **Do NOT use line-level grep for `author:`.** It matches prose containing "authorization", "authoritative", etc. at the same indent. Use a YAML parser instead:
 
 ```python
-import yaml, glob
-for path in glob.glob("~/.hermes/skills/**/SKILL.md", recursive=True):
-    with open(path) as f:
-        parts = f.read().split("---")
-    if len(parts) >= 3:
-        fm = yaml.safe_load(parts[1])
-        author = (fm.get("metadata") or {}).get("author") or fm.get("author")
-        if not author:
-            print(f"NO AUTHOR: {path}")
+import yaml, glob, os
+
+# Check BOTH locations — default profile and indigo profile
+search_roots = [
+    os.path.expanduser("~/.hermes/skills"),
+    os.path.expanduser("~/.hermes/profiles/indigo/skills"),
+]
+for root in search_roots:
+    for path in glob.glob(f"{root}/**/SKILL.md", recursive=True):
+        if ".archive" in path:
+            continue
+        with open(path) as f:
+            parts = f.read().split("---")
+        if len(parts) >= 3:
+            try:
+                fm = yaml.safe_load(parts[1])
+                if not isinstance(fm, dict):
+                    print(f"YAML ERR: {path}")
+                    continue
+                author = (fm.get("metadata") or {}).get("author") or fm.get("author")
+                name = fm.get("name", "")
+                if not author:
+                    print(f"NO AUTHOR: {path} (name={name})")
+            except Exception as e:
+                print(f"YAML ERR: {path} ({e})")
 ```
 
 If you must use grep, verify every match falls between `---` delimiters (YAML frontmatter context), not in the markdown body. See `references/audit-2026-05-30.md` for a concrete false-positive example.
+
+### Check for YAML Errors
+
+Invalid YAML frontmatter makes skills invisible to `skills_list`/`skill_view`. Common causes:
+- Unescaped markdown in `description:` fields (e.g., `**bold**` or `''italic''` that YAML interprets as flow indicators)
+- Bare `---` delimiters inside the document body (not fenced in code blocks)
+- Unquoted special characters (`:`, `#`, `*`, `&`, `!`) at the start of description values
+
+**Fix:** Read the raw file, identify the problematic line in the frontmatter, and either quote the value or escape the special characters. For `description:` fields containing markdown, wrap the entire value in single quotes or use the `>-` block scalar.
+
+### Check for Empty Profile Stubs
+
+The default profile (`~/.hermes/skills/`) may contain empty category directories (DESCRIPTION.md stubs with no SKILL.md). These are not skills — they're artifacts from hub installs. During audit, distinguish:
+- **Real skill directories:** contain a `SKILL.md` file
+- **Empty stubs:** contain only `DESCRIPTION.md` or are completely empty
+
+Empty stubs should be reported as hygiene issues, not counted as skills. Do NOT try to "fix" them — just flag for user review.
+
+### Check for SOUL Repo Install Gap
+
+Skills written to `/root/soul/skills/` are NOT visible to the agent until copied to `~/.hermes/profiles/indigo/skills/`. During audit, compare both directories:
+
+```bash
+diff <(ls /root/soul/skills/ | sort) <(ls ~/.hermes/profiles/indigo/skills/ | sort)
+```
+
+Any skill in `/root/soul/skills/` missing from the active profile is an install gap. Copy it over immediately. See `references/soul-repo-skill-install-gap.md`.
+
+### Check for Orphaned Reference Files
+
+Skills accumulate reference files over time that are no longer linked from the SKILL.md support file map. During audit, cross-reference:
+
+```bash
+# Quick check for a single skill:
+comm -23 <(ls <skill_dir>/references/*.md 2>/dev/null | sort) <(grep -oP 'references/\\S+' <skill_dir>/SKILL.md | sed 's/[`.,;:]$//' | sort -u)
+```
+
+Orphaned references are not Critical — they don't break the skill. But 100+ orphans across the library signals drift. Flag skills with >10 orphaned references for cleanup.
+
+### Check for Support File Map Completeness
+
+The SKILL.md's Support File Map (or equivalent table) claims to be the canonical index of all reference files and scripts. Audit it against reality:
+
+1. **Duplicate entries** — same file listed twice (copy-paste error during merge)
+2. **Phantom references** — listed in map but NOT on disk (stale entry, file was deleted or renamed)
+3. **Orphaned files** — on disk but NOT in map (file added but map never updated)
+4. **Directory-as-reference** — map entry points to a directory path instead of a specific file (malformed entry)
+5. **Body-only references** — referenced in SKILL.md prose but missing from the map (map is incomplete)
+
+A clean Support File Map should have zero duplicates, zero phantoms, and every file on disk should be either in the map or confirmed as intentionally unmapped (e.g., `.archive/` contents).
 
 ---
 
@@ -176,7 +243,7 @@ Merged from `ocas-critique` (v2.6.0).
 
 ### Procedure
 
-**Phase 1 — Read:** Read the full SKILL.md, all reference files, all scripts. Measure line count (flag if >500). Check for phantom references.
+**Phase 1 — Read:** Read the full SKILL.md, all reference files, all scripts. Measure line count (flag if >500). Check for phantom references. **Scan Pitfalls/What NOT to Do sections for absolute prohibitions that may encode failed attempts rather than confirmed hard constraints** — see Pitfall "Absolute prohibitions encoding failed attempts."
 
 **Phase 2 — Score:** Measure code ratio first (`python3 scripts/critique_code_ratio.py <path>/SKILL.md`). Target: under 20%. Evaluate each dimension 1-5 using `references/critique-rubric.md`. Print the score table. Bands: A=40-50, B=30-39, C=20-29, D=10-19, F=0-9.
 
@@ -396,8 +463,24 @@ triggers:
 - **Section renumbering after insertion:** When inserting a new section (e.g., during a merge), ALL downstream section numbers and TOC entries must be incremented. Use `grep -n '^## '` to verify numbering is contiguous after any structural insert. Missing this causes broken TOC links and duplicate section numbers.
 - **Interactive menu 4-choice limit:** The `clarify` tool supports max 4 visible choices (5th is always "Other"). For skills with >4 operations, either chunk into categories (first clarify picks category, second picks action) or list all operations in the menu text and use the first 4 as the most common, with "Other" capturing the rest. The menu text should list ALL operations for agent reference regardless of the 4-choice UI limit.
 - **Always update at least one skill per session**: After any non-trivial session, look for at least one skill to update. "Nothing to save" is the exception, not the rule. Signals: user corrected style/tone/workflow, new technique discovered, loaded skill was wrong/missing steps, tool-usage pattern emerged.
+- **`--skills-dir` arg not propagating:** The `critique_10khr_runner.py` accepts `--skills-dir` but the value was never passed to `find_ocas_skills()` or `run_full_assessment()` — they used the module-level `SKILLS_DIR` instead. Fixed 2026-06-14: both functions now accept an explicit `skills_dir` parameter, and `main()` wires the argument through. Always `grep SKILLS_DIR` after changing the default to confirm no stale references remain.
 - **Sequential patch fragility during bulk extraction:** When moving multiple inline sections to `references/` in one pass, sequential `patch` calls corrupt the file (eaten headings, duplicates, line-number drift). Prefer a full-file `write_file` rewrite. Always `grep -n '^## '` after structural patches. Scan moved code for absolute paths (`/root/` → `{agent_root}/`) and verify cross-skill path existence.
 - **Reference file path convention:** Design references live at `~/.hermes/references/design/`. If you find design refs at old paths like `/root/references/creative/`, migrate them to the design directory and update all pointers.
+- **Post-migration reference drift**: After a backend migration (e.g., database engine change, API version upgrade), ALL reference files must be audited — not just code. Check every `.md` in `references/` for: stale imports, old DB paths, deprecated query languages, outdated CLI commands, and code examples that reference the removed backend. Orphaned reference files (not linked from SKILL.md's support file map) should be archived or deleted. This is a D10 (Completeness) failure pattern — the SKILL.md description says "SQLite" but the schema reference still documents the old engine.
+- **Stale code examples in reference files**: When critiquing a skill, read the code examples in ALL referenced `.md` files — not just SKILL.md. Reference files often contain Python/Cypher/CLI examples that drift after migrations. A single stale `import real_ladybug` in a reference file is a Critical D10 finding.
+- **Orphaned reference file detection**: During audit or critique, cross-reference the SKILL.md support file map against actual files in `references/`. Files on disk but not linked from SKILL.md are orphaned — archive them to `references/.archive/`. Quick check: `comm -23 <(ls references/*.md | sort) <(grep -oP 'references/\S+' SKILL.md | sed 's/[`.,;:]$//' | sort -u)`.
+- **Category field discipline:** The `category:` frontmatter field controls `skills_list` grouping. Only `util-` prefixed skills should carry `category: utility`. Never add `category: utility` to non-util skills. When reorganizing the library, audit all `category:` fields and remove any that violate this rule.
+- **Cron-aware skill deletion:** Before deleting a skill directory, check whether any cron jobs reference it. Run `cronjob action=list` and grep for the skill name. If found, either update the cron job to reference a different skill or delete the cron job first. Silently breaking cron jobs by deleting their referenced skill causes invisible failures that may not surface for days.
+- **Profile ↔ monorepo sync gap:** Skills with a `source:` field pointing to a GitHub repo must have their profile copy (`~/.hermes/profiles/indigo/skills/<name>/`) and monorepo copy in sync. After any skill edit, run `diff` on both SKILL.md files before considering the session complete. The monorepo is canonical for `source:`-referenced skills.
+- **Skill sprawl — prefer functions over new skills:** Before creating a new skill, check `skills_list` for an existing umbrella. If one exists, add a subsection or reference file instead. Style guides → reference inside the output skill. Single-channel integrations → module inside the comms skill. Prompt wrappers → reference file. Testing utilities → operational skills. Skills invoked by only one parent → sub-module of that parent. See `references/skill-architecture-sprawl-audit-2026-06-17.md` for the full audit and merge plan.
+- **Audit must check both profiles:** The active skill library lives at `~/.hermes/profiles/indigo/skills/`, not `~/.hermes/skills/`. The default profile (`~/.hermes/skills/`) may contain empty stub directories from hub installs — these are NOT skills. Always audit the indigo profile path. Check both if the user asks for a full system audit.
+- **Deletion marked but not executed — completion-reflex failure:** When a skill (or any task) is marked for deletion/repeatedly identified as needing deletion, execute immediately. Do not mark it mentally and move on. The `ocas-critique` skill was identified for deletion 5+ times over multiple sessions and was only deleted when Jared directly asked "didn't you already delete this?" — if a deletion is agreed upon, do it in the same session. This applies to all tasks: if the decision is made, execute before context switches.
+- **Memory full — consolidate before adding:** When the memory tool returns "Memory at X/2,200 chars" errors, stop adding new entries. Consolidate first: merge overlapping entries, remove stale one-off task narratives, and reduce verbosity. Research details, Wikipedia corrections, and session-specific notes do not belong in memory — they belong in session transcripts. Memory is for durable facts: user preferences, environment details, tool quirks, and stable conventions.
+- **"Don't say MEMORY.md" — structural fixes over memory reminders:** When Jared asks "how will you ensure you won't keep doing X?", the answer is NOT "remember this in memory." Memory is a speed bump, not a wall — it gets re-read as a directive and can cause repeated work. The answer should be: identify the structural fix that makes the mistake impossible (symlinks, path conventions, tool defaults). If the fix is already in place but you're still making the mistake, the issue is attention/awareness — slow down and check the system prompt's path conventions before acting.
+- **YAML errors from unescaped markdown in frontmatter:** A `description:` field containing `**bold**`, `''italic''`, or unquoted special characters (`:`, `#`, `*`) breaks YAML parsing, making the skill invisible. During audit, catch YAML parse errors separately from missing fields — they're Critical (skill won't load at all). Fix by quoting the value or using `>-` block scalar.
+- **Orphaned reference files accumulate silently:** Every session that adds a reference file but forgets to update the support file map creates drift. During audit, flag skills with >10 orphaned references. This is a hygiene issue, not Critical — but it makes the library harder to navigate and inflates the support file count.
+- **Empty default-profile stubs are not skills:** Hub installs may leave empty category directories under `~/.hermes/skills/` (apple, creative, email, etc.) with only a `DESCRIPTION.md`. These are artifacts, not skills. Report them separately in audit output — do not count them as skills or flag them as missing authors.
+- **Judging a skill by its name/description ("empty wrapper shell" anti-pattern):** An agent's highest-error move is to read only the skill's name + description, form a conclusion ("thin wrapper," "empty shell," "just delegates"), and then act on that conclusion without reading the SKILL.md body, references, or scripts. ocas-skilllab itself was called an "empty wrapper shell" — it is 350+ lines of procedure with 38 reference files and 3 scripts. Before evaluating or acting on any skill: read the FULL SKILL.md, all reference files, all scripts. The name and description are the front door, not the house. If you catch yourself using words like "wrapper," "shell," "thin," "just delegates" — stop, you are guessing. Read the full content. This applies doubly when deciding whether a skill is worth keeping, merging, or deleting.
 
 ---
 
@@ -432,6 +515,7 @@ When a capability is retired (archived, superseded, or removed), sweep all refer
 | `references/skill-sanitize-checklist.md` | Post-sanitize verification checklist + scanner false-positives |
 | `references/mempalace-gotchas.md` | MemPalace MCP tool constraints — kg_add character rejections, drawer vs. KG guidance |
 | `references/audit-2026-06-05.md` | June 2026 audit — git merge conflict repair, cross-profile write guard, remaining author gaps |
+| `references/audit-2026-06-18.md` | June 2026 audit — full library scan, 94 skills, 26 missing authors, YAML errors, orphaned refs |
 | `references/critique-rubric.md` | During Phase 2 scoring — full 10-dimension rubric |
 | `references/critique-issue-categorization.md` | During Phase 3 — Critical/Major/Minor rules |
 | `references/critique-assessment-mode.md` | Before assessment — decision table for assess vs. fix |
@@ -454,6 +538,9 @@ When a capability is retired (archived, superseded, or removed), sweep all refer
 | `references/critique-10khr-2026-05-30.md` | May 30 session log — historical reference |
 | `references/critique-10khr-2026-05-30-r2.md` | May 30 session round 2 — historical reference |
 | `references/critique-10khr-2026-05-30-learnings.md` | After May 30 session — distilled patterns |
+| `references/critique-2026-06-15-session-learnings.md` | June 15 session — critique workflow validation, failed-attempt encoding anti-pattern, profile↔monorepo sync |
+| `references/skill-architecture-sprawl-audit-2026-06-17.md` | Skill sprawl audit — merge candidates, anti-patterns, class-level umbrella principle |
+| `references/soul-repo-skill-install-gap.md` | Skills in `/root/soul/skills/` not visible until installed in active profile — detection + fix |
 | `references/design-library.md` | When building any UI — design reference library (glitch aesthetic, DESIGN.md spec, 72 brand systems, 67 styles, 200 iOS apps, taste-skill anti-slop enforcement), usage guide, refresh commands |
 | `scripts/critique_code_ratio.py` | During Phase 2 — code ratio measurement |
 | `scripts/critique_10khr_runner.py` | During 10khr — heuristic scoring and targeting (over-scores by 6-10pt) |
