@@ -25,11 +25,9 @@ State tracked in:
 
 import json
 import os
-import subprocess
 import sys
 import glob
 from datetime import datetime, timezone
-from pathlib import Path
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -39,9 +37,6 @@ TARGET_SCORE = 50
 REASSESS_INTERVAL = 5  # re-score full library after N skills improved
 STATE_FILE = os.path.expanduser(
     "~/.hermes/skills/ocas-critique/commons/data/ocas-critique/10khr-state.json"
-)
-LEARNINGS_FILE = os.path.expanduser(
-    "~/.hermes/skills/ocas-critique/references/10khr-learnings.md"
 )
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -68,14 +63,16 @@ def save_state(state: dict):
         json.dump(state, f, indent=2)
 
 
-def find_ocas_skills() -> list[str]:
+def find_ocas_skills(skills_dir: str = None) -> list[str]:
     """Return sorted list of ocas-* skill directory paths."""
+    if skills_dir is None:
+        skills_dir = SKILLS_DIR
     skills = []
     # Top-level ocas-* dirs
-    for d in sorted(glob.glob(os.path.join(SKILLS_DIR, f"{OCAS_PREFIX}*/SKILL.md"))):
+    for d in sorted(glob.glob(os.path.join(skills_dir, f"{OCAS_PREFIX}*/SKILL.md"))):
         skills.append(os.path.dirname(d))
     # Subdirectory ocas-* dirs (infrastructure/, ocas/)
-    for d in sorted(glob.glob(os.path.join(SKILLS_DIR, "*/", f"{OCAS_PREFIX}*/SKILL.md"))):
+    for d in sorted(glob.glob(os.path.join(skills_dir, "*/", f"{OCAS_PREFIX}*/SKILL.md"))):
         skills.append(os.path.dirname(d))
     return skills
 
@@ -129,17 +126,10 @@ def score_skill(skill_path: str) -> dict:
     scores["D2"] = min(5, d2)
 
     # ── D3: Conciseness (code ratio) ──
-    in_block = False
-    code_lines = 0
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
-            in_block = not in_block
-            continue
-        if in_block:
-            code_lines += 1
-    total = len(lines)
-    ratio = (code_lines / total * 100) if total else 0
+    from critique_code_ratio import measure_code_ratio
+    ratio_result = measure_code_ratio(skill_md)
+    ratio = ratio_result["ratio"]
+    total = ratio_result["total_lines"]
     if ratio < 15:
         d3 = 5
     elif ratio < 20:
@@ -240,9 +230,9 @@ def score_skill(skill_path: str) -> dict:
     }
 
 
-def run_full_assessment() -> list[dict]:
+def run_full_assessment(skills_dir: str = None) -> list[dict]:
     """Score all ocas-* skills and return sorted list (lowest first)."""
-    skills = find_ocas_skills()
+    skills = find_ocas_skills(skills_dir)
     results = []
     for sp in skills:
         result = score_skill(sp)
@@ -250,12 +240,6 @@ def run_full_assessment() -> list[dict]:
     results.sort(key=lambda r: r["total"])
     return results
 
-
-def append_learning(entry: str):
-    """Append a learning entry to the journal."""
-    os.makedirs(os.path.dirname(LEARNINGS_FILE), exist_ok=True)
-    with open(LEARNINGS_FILE, "a") as f:
-        f.write(f"\n{entry}\n")
 
 
 def generate_report(assessment: list[dict], state: dict) -> str:
@@ -299,13 +283,14 @@ def main():
     args = parser.parse_args()
 
     report_only = args.report_only
+    skills_dir = args.skills_dir
     state = load_state()
 
     if not state.get("started_at"):
         state["started_at"] = datetime.now(timezone.utc).isoformat()
 
     # Step 1: Full assessment
-    assessment = run_full_assessment()
+    assessment = run_full_assessment(skills_dir)
     state["last_run"] = datetime.now(timezone.utc).isoformat()
 
     # Step 2: Find lowest-scoring skill below target

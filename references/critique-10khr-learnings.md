@@ -97,3 +97,37 @@ When moving code blocks to reference files:
 3. Replace interactive commands with hardcoded paths with template-based equivalents
 
 See `critique-10khr-2026-05-31.md` for full session details.
+
+---
+
+## Session: 2026-06-14 — util-headhunter (36 → 42/50)
+
+### What was fixed
+1. **No support file map** — Added full support file map with "When to read" column for 3 references + 2 scripts (D8: 3→5, D4: 4→5)
+2. **`HttpError` not imported** — `check_replies.py` used `HttpError` on line 172 but never imported it (NameError crash). Added `from googleapiclient.errors import HttpError` (D9: 3→4)
+3. **Duplicate curl blocks** — Inline curl examples in SKILL.md were duplicates of `references/searxng-patterns.md`. Replaced with single pointer (D3: maintained at 3, but removed redundancy)
+4. **Missing WHEN/NOT clause** — Description frontmatter lacked trigger conditions. Added "Use when..." and "NOT for..." (D2: 3→4)
+5. **No error handling table** — Added error table covering SearXNG down, Gmail MCP unavailable, LinkedIn MCP rate limited, missing sent-roles.jsonl, incomplete research (D7: 3→4)
+
+### Score impact
+| Dim | Before | After | Delta |
+|-----|--------|-------|-------|
+| D2 | 3 | 4 | +1 |
+| D4 | 4 | 5 | +1 |
+| D7 | 3 | 4 | +1 |
+| D8 | 3 | 5 | +2 |
+| D9 | 3 | 4 | +1 |
+| **Total** | **36** | **42** | **+6** |
+
+### Key learning: Heuristic over-score confirmed again
+util-headhunter: heuristic 39, manual 36. The 3-point gap is consistent with prior sessions. The heuristic misses:
+- D4: Doesn't penalize missing support file map
+- D9: Can't detect missing imports without executing scripts
+- D8: Undervalues progressive disclosure gaps
+
+**Rule:** Heuristic is for ranking only. Always do manual Phase 1-6 before declaring a skill "done."
+
+### Key learning: `--skills-dir` arg bug in 10khr_runner
+The `critique_10khr_runner.py` accepted `--skills-dir` but never passed it to `find_ocas_skills()` or `run_full_assessment()`. Both used the module-level `SKILLS_DIR` (~/.hermes/skills) instead. Fixed by adding `skills_dir` parameter to both functions and wiring `args.skills_dir` through `main()`.
+
+**Lesson:** When adding CLI args that affect module-level config, grep for all uses of the old variable to ensure nothing is missed.

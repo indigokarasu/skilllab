@@ -3,7 +3,6 @@
 
 import curses
 import os
-import subprocess
 import sys
 import yaml
 
@@ -21,6 +20,52 @@ MENU_ITEMS = [
     ("quit",       "Exit skill lab"),
 ]
 
+
+# ─── Shared curses helpers ──────────────────────────────────────────────────
+
+def init_colors():
+    """Initialize color pairs once for the session."""
+    curses.start_color()
+    curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)     # title
+    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)     # normal
+    curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_CYAN)      # selected
+    curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)    # key hint
+    curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)     # success
+    curses.init_pair(6, curses.COLOR_RED, curses.COLOR_BLACK)       # warning
+
+
+def scroll_navigate(key, row, scroll, visible, total_items):
+    """Handle arrow keys for scroll navigation. Returns (row, scroll)."""
+    if key == curses.KEY_UP:
+        row = max(0, row - 1)
+        if row < scroll:
+            scroll = row
+    elif key == curses.KEY_DOWN:
+        row = min(total_items - 1, row + 1)
+        if row >= scroll + visible:
+            scroll = row - visible + 1
+    return row, scroll
+
+
+def draw_title_row(stdscr, title, hint=""):
+    """Draw a title row with optional right-aligned hint."""
+    h, w = stdscr.getmaxyx()
+    stdscr.addstr(0, 0, title, curses.color_pair(1) | curses.A_BOLD)
+    stdscr.addstr(0, len(title), "─" * max(0, w - len(title)), curses.color_pair(1))
+    if hint:
+        stdscr.addstr(0, max(0, w - len(hint)), hint, curses.color_pair(4))
+
+
+def draw_scroll_indicators(stdscr, row, scroll, visible, total_items):
+    """Draw scroll indicators if there are more items than visible."""
+    h, w = stdscr.getmaxyx()
+    if scroll > 0:
+        stdscr.addstr(5, w - 3, "▲", curses.color_pair(4))
+    if scroll + visible < total_items:
+        stdscr.addstr(5 + visible - 1, w - 3, "▼", curses.color_pair(4))
+
+
+# ─── Core logic ──────────────────────────────────────────────────────────────
 
 def scan_skills():
     """Return list of (name, path, has_author, has_license, has_triggers, is_archive)"""
@@ -68,15 +113,12 @@ def parse_frontmatter(path):
     return info
 
 
+# ─── TUI screens ─────────────────────────────────────────────────────────────
+
 def draw_menu(stdscr):
+    """Main menu screen. Returns selected action string or None."""
     curses.curs_set(0)
-    curses.start_color()
-    curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)     # title
-    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)     # normal
-    curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_CYAN)      # selected
-    curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)    # key hint
-    curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)     # success
-    curses.init_pair(6, curses.COLOR_RED, curses.COLOR_BLACK)       # warning
+    init_colors()
 
     row = 0
     scroll = 0
@@ -87,20 +129,11 @@ def draw_menu(stdscr):
         stdscr.clear()
         h, w = stdscr.getmaxyx()
 
-        # Title
-        title = " ocas-skilllab "
-        stdscr.addstr(0, 0, title, curses.color_pair(1) | curses.A_BOLD)
-        stdscr.addstr(0, len(title), "─" * max(0, w - len(title)), curses.color_pair(1))
+        draw_title_row(stdscr, " ocas-skilllab ", " ↑↓: navigate  ⏎: select  q: quit ")
 
-        # Key hints
-        hint = " ↑↓: navigate  ⏎: select  q: quit "
-        stdscr.addstr(0, max(0, w - len(hint)), hint, curses.color_pair(4))
-
-        # Instructions
         stdscr.addstr(2, 2, "skill library management", curses.color_pair(2))
         stdscr.addstr(3, 2, "use arrow keys to navigate, enter to select", curses.color_pair(4))
 
-        # Menu items
         visible = min(len(MENU_ITEMS), h - 8)
         for i in range(visible):
             idx = scroll + i
@@ -115,42 +148,25 @@ def draw_menu(stdscr):
                 sel = f"   {label:<12} {desc}"
                 stdscr.addstr(y, 0, sel[:w-1], curses.color_pair(2))
 
-        # Message area
         if message:
             stdscr.addstr(h-2, 2, message[:w-4], curses.color_pair(message_color))
 
-        # Scroll indicator
-        if scroll > 0:
-            stdscr.addstr(5, w-3, "▲", curses.color_pair(4))
-        if scroll + visible < len(MENU_ITEMS):
-            stdscr.addstr(5 + visible - 1, w-3, "▼", curses.color_pair(4))
+        draw_scroll_indicators(stdscr, row, scroll, visible, len(MENU_ITEMS))
 
         stdscr.refresh()
 
         key = stdscr.getch()
+        row, scroll = scroll_navigate(key, row, scroll, visible, len(MENU_ITEMS))
 
-        if key == curses.KEY_UP:
-            row = max(0, row - 1)
-            if row < scroll:
-                scroll = row
-        elif key == curses.KEY_DOWN:
-            row = min(len(MENU_ITEMS) - 1, row + 1)
-            if row >= scroll + visible:
-                scroll = row - visible + 1
-        elif key == ord('q') or key == 27:  # q or esc
+        if key == ord('q') or key == 27:
             return None
         elif key == curses.KEY_ENTER or key == 10 or key == 13:
             return MENU_ITEMS[row][0]
 
 
 def draw_skill_list(stdscr, skills, title, filter_fn=None):
-    """Browse skill list, return selected skill name or None"""
+    """Browse skill list, return selected skill name or None."""
     curses.curs_set(0)
-    curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
-    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)
-    curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_CYAN)
-    curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-    curses.init_pair(6, curses.COLOR_RED, curses.COLOR_BLACK)
 
     row = 0
     scroll = 0
@@ -162,11 +178,7 @@ def draw_skill_list(stdscr, skills, title, filter_fn=None):
         h, w = stdscr.getmaxyx()
 
         t = f" {title} ({len(filtered)} skills) "
-        stdscr.addstr(0, 0, t, curses.color_pair(1) | curses.A_BOLD)
-        stdscr.addstr(0, len(t), "─" * max(0, w - len(t)), curses.color_pair(1))
-
-        hint = " ↑↓: navigate  ⏎: inspect  b: back "
-        stdscr.addstr(0, max(0, w - len(hint)), hint, curses.color_pair(4))
+        draw_title_row(stdscr, t, " ↑↓: navigate  ⏎: inspect  b: back ")
 
         visible = min(len(filtered), h - 6)
         for i in range(visible):
@@ -185,7 +197,6 @@ def draw_skill_list(stdscr, skills, title, filter_fn=None):
 
             if idx == row:
                 stdscr.addstr(y, 0, line[:w-1], curses.color_pair(3) | curses.A_BOLD)
-                # Description on next line
                 if y + 1 < h - 1 and info["description"]:
                     desc = f"    {info['description'][:w-6]}"
                     stdscr.addstr(y + 1, 0, desc, curses.color_pair(4))
@@ -196,16 +207,9 @@ def draw_skill_list(stdscr, skills, title, filter_fn=None):
         stdscr.refresh()
 
         key = stdscr.getch()
+        row, scroll = scroll_navigate(key, row, scroll, visible, len(filtered))
 
-        if key == curses.KEY_UP:
-            row = max(0, row - 1)
-            if row < scroll:
-                scroll = row
-        elif key == curses.KEY_DOWN:
-            row = min(len(filtered) - 1, row + 1)
-            if row >= scroll + visible:
-                scroll = row - visible + 1
-        elif key == ord('q') or key == 27 or key == ord('b'):
+        if key == ord('q') or key == 27 or key == ord('b'):
             return None
         elif key == curses.KEY_ENTER or key == 10 or key == 13:
             return filtered[row][0] if filtered else None
@@ -214,8 +218,6 @@ def draw_skill_list(stdscr, skills, title, filter_fn=None):
 def inspect_skill(stdscr, name, path, info):
     """Show skill details"""
     curses.curs_set(0)
-    curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
-    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLACK)
 
     lines = [
         f"Name:        {info['name'] or name}",
@@ -231,9 +233,7 @@ def inspect_skill(stdscr, name, path, info):
         stdscr.clear()
         h, w = stdscr.getmaxyx()
 
-        stdscr.addstr(0, 0, f" {name} ", curses.color_pair(1) | curses.A_BOLD)
-        stdscr.addstr(0, len(name) + 2, "─" * max(0, w - len(name) - 2), curses.color_pair(1))
-        stdscr.addstr(0, max(0, w - 12), " q: back ", curses.color_pair(1))
+        draw_title_row(stdscr, f" {name} ", " q: back ")
 
         visible = min(len(lines), h - 2)
         for i in range(visible):
@@ -254,6 +254,7 @@ def inspect_skill(stdscr, name, path, info):
 
 
 def confirm(stdscr, prompt):
+    """Yes/no confirmation dialog."""
     curses.curs_set(0)
     stdscr.clear()
     h, w = stdscr.getmaxyx()
@@ -268,6 +269,8 @@ def confirm(stdscr, prompt):
             return False
 
 
+# ─── Actions ─────────────────────────────────────────────────────────────────
+
 def run_action(action, stdscr):
     """Execute selected action"""
     skills = scan_skills()
@@ -276,8 +279,7 @@ def run_action(action, stdscr):
         return False
 
     if action == "audit":
-        # Show skills missing author
-        selected = draw_skill_list(stdscr, skills, "Audit — skills missing author",
+        draw_skill_list(stdscr, skills, "Audit — skills missing author",
             lambda n, p, i, a: not i["author"] and not a)
 
     elif action == "hygiene":
