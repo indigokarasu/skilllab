@@ -6,8 +6,14 @@ import os
 import sys
 import yaml
 
-SKILLS_DIR = os.path.expanduser("~/.hermes/skills")
-ARCHIVE_DIR = os.path.expanduser("~/.hermes/skills/.archive")
+SKILLS_DIR = os.path.expanduser("~/.hermes/profiles/indigo/skills")
+ARCHIVE_DIR = os.path.expanduser("~/.hermes/profiles/indigo/skills/.archive")
+
+# All skill search roots (active profile + default profile + all other profiles)
+ALL_SKILL_ROOTS = [SKILLS_DIR]
+_default_profile_skills = os.path.expanduser("~/.hermes/skills")
+if os.path.isdir(_default_profile_skills):
+    ALL_SKILL_ROOTS.append(_default_profile_skills)
 
 MENU_ITEMS = [
     ("audit",      "Audit skill library — find orphans, author gaps, frontmatter issues"),
@@ -68,22 +74,44 @@ def draw_scroll_indicators(stdscr, row, scroll, visible, total_items):
 # ─── Core logic ──────────────────────────────────────────────────────────────
 
 def scan_skills():
-    """Return list of (name, path, has_author, has_license, has_triggers, is_archive)"""
+    """Return list of (name, path, has_author, has_license, has_triggers, is_archive).
+
+    Uses recursive glob to find skills at any depth across all profile directories.
+    Deduplicates by skill name (first found wins; active profile takes priority).
+    """
+    import glob as _glob
+    seen = set()
     results = []
-    for entry in sorted(os.listdir(SKILLS_DIR)):
-        if entry.startswith(".") or entry == "__pycache__":
-            continue
-        skill_md = os.path.join(SKILLS_DIR, entry, "SKILL.md")
-        if not os.path.isfile(skill_md):
-            continue
-        info = parse_frontmatter(skill_md)
-        results.append((entry, skill_md, info, False))
-    for entry in sorted(os.listdir(ARCHIVE_DIR)):
-        skill_md = os.path.join(ARCHIVE_DIR, entry, "SKILL.md")
-        if not os.path.isfile(skill_md):
-            continue
-        info = parse_frontmatter(skill_md)
-        results.append((entry, skill_md, info, True))
+
+    def _scan_dir(directory, is_archive=False):
+        if not os.path.isdir(directory):
+            return
+        for path in sorted(_glob.glob(f"{directory}/**/SKILL.md", recursive=True)):
+            name = os.path.basename(os.path.dirname(path))
+            if name.startswith(".") or name == "__pycache__":
+                continue
+            if name in seen:
+                continue
+            if ".archive" in path and not is_archive:
+                continue
+            seen.add(name)
+            info = parse_frontmatter(path)
+            results.append((name, path, info, is_archive))
+
+    # Scan active profile first, then default profile, then all other profiles
+    for root_dir in ALL_SKILL_ROOTS:
+        _scan_dir(root_dir, is_archive=False)
+        _scan_dir(os.path.join(root_dir, ".archive"), is_archive=True)
+
+    # Also scan other profiles (koda, forge, etc.) without overriding
+    profiles_dir = os.path.expanduser("~/.hermes/profiles")
+    if os.path.isdir(profiles_dir):
+        for profile in sorted(os.listdir(profiles_dir)):
+            profile_skills = os.path.join(profiles_dir, profile, "skills")
+            if os.path.isdir(profile_skills) and profile_skills not in ALL_SKILL_ROOTS:
+                _scan_dir(profile_skills, is_archive=False)
+                _scan_dir(os.path.join(profile_skills, ".archive"), is_archive=True)
+
     return results
 
 
