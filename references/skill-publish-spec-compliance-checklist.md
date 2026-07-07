@@ -106,3 +106,54 @@ def audit_skill(skill_path):
 All 29 OCAS skills pass with zero spec failures.
 Warnings (non-blocking): missing `license`, `metadata.hermes` extension, `metadata.email`, non-standard top-level `version` (ocas-reach), `self_update` (ocas-finch).
 See session notes for full breakdown.
+
+## Nous Research Optional Skills — Additional Requirements
+
+Source: https://hermes-agent.nousresearch.com/docs/reference/optional-skills-catalog
+
+Skills submitted to the Nous Research optional-skills catalog have additional requirements beyond the base agentskills.io spec:
+
+### Description
+- **≤ 60 characters, one sentence, ends with a period.** This is a hard limit enforced by reviewers.
+- State the capability, not the implementation.
+- No marketing words ("powerful", "comprehensive", "seamless", "advanced").
+- Don't repeat the skill name in the description.
+
+### Author Field
+- **Credit the human contributor first**: `Author Name (github-handle)`.
+- If the contributor used Hermes to draft the skill, replace "Hermes Agent" in git history with the contributor's actual name.
+- **NEVER use the agent owner's name/email without explicit permission.** Default to the contributor's identity or a neutral attribution.
+
+### Platform Gating
+- Skills using POSIX-only primitives (`fcntl`, `termios`, `/proc`, `os.setsid`, `signal.SIGKILL`, hardcoded `/tmp` paths, `osascript`, `apt`, `systemctl`) **must** declare `platforms: [linux]` or `platforms: [macos]` in frontmatter.
+- Default posture: fix cross-platform first. Gate only when the dependency is genuinely platform-bound.
+
+### Section Order (Modern)
+```
+# <Skill> Skill
+Intro (what it does, what it doesn't — 2-3 sentences max)
+
+## When to Use
+## Prerequisites
+## How to Run
+## Quick Reference
+## Procedure
+## Pitfalls
+## Verification
+```
+
+### Target Length
+- ~100 lines for a simple skill
+- ~200 lines for a complex skill
+- Cut redundant intro fluff and marketing prose
+
+### Tests
+- Required at `tests/skills/test_<skill>_skill.py`
+- Use only stdlib + pytest + `unittest.mock`
+- No live network calls
+- Run via `scripts/run_tests.sh tests/skills/test_<skill>_skill.py -q`
+
+### Do NOT Submit
+- Skills with external dependencies (unless absolutely necessary — prefer stdlib)
+- Skills that duplicate existing bundled skills
+- Skills that are too narrow/specialized (better suited for Skills Hub)

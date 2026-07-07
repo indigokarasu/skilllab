@@ -9,31 +9,45 @@ Quick Wins, agentskill.sh best practices, and OCAS authoring rules v3.1.0.
 
 ## D1: Frontmatter (Spec Compliance)
 
-Does the YAML frontmatter follow the Agent Skills specification?
+Does the YAML frontmatter follow the Agent Skills specification and Hermes conventions?
 
 | Score | Criteria |
 |-------|----------|
-| **5** | `name` and `description` present and valid. Optional fields (`license`, `metadata`, `includes`) used where appropriate. Name matches directory, lowercase-hyphens only. `license` is a top-level frontmatter field (not nested in `metadata`). |
-| **4** | Required fields valid. One minor issue (name doesn't match directory, missing useful optional field). |
-| **3** | Required fields present but one has issues (description too short, name uses uppercase). |
+| **5** | `name` and `description` present and valid. Optional fields (`license`, `metadata`, `includes`, `triggers`) used where appropriate. Name matches directory, lowercase-hyphens only. `license` is a top-level frontmatter field. `metadata.hermes` present with `tags` and `category`. Env vars declared in `metadata.hermes.config` if the skill uses any. |
+| **4** | Required fields valid. One minor issue (missing `category`, env vars only in body table). |
+| **3** | Required fields present but one has issues (description too short, `metadata.hermes` missing). |
 | **2** | Missing one required field, or name/description violate constraints. |
 | **1** | No frontmatter, or both required fields missing/invalid. |
 
-Checks:
+Core checks:
 - `name`: 1-64 chars, lowercase alphanumeric + hyphens, no leading/trailing/consecutive hyphens
 - `description`: 1-1024 chars, non-empty
 - No XML tags in name or description
 - Name must not contain "anthropic" or "claude"
 - `includes:` should list `references/**` if that directory exists
 - `license:` must be a top-level frontmatter field
+- `triggers:` present for agent-authored skills (enables slash command discovery)
+
+Hermes-specific checks (from [Skills System docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills)):
+- `metadata.hermes.tags`: array of tag strings for `skills_list` grouping
+- `metadata.hermes.category`: string — controls `skills_list` category grouping (e.g. `infrastructure`, `devops`, `productivity`). Must match an existing category; don't invent ad-hoc values
+- `metadata.hermes.config`: if the skill uses env vars, declare them here with `key`, `description`, `default`. This enables `hermes config migrate` and `hermes config show`. Env vars only documented in a body table (not in `config`) is a D1-4 deduction
+- `metadata.hermes.fallback_for_toolsets` / `requires_toolsets`: conditional activation — only set when the skill is a fallback or requires specific toolsets
+- `metadata.hermes.fallback_for_tools` / `requires_tools`: same, for individual tools
+- `platforms:` — optional OS restriction (`[macos]`, `[linux]`, `[windows]`, or combo). If omitted, skill loads on all platforms
+- `required_environment_variables:` — formal declaration for secure setup prompts (env var name, prompt text, help URL, required_for level)
+- Directory structure follows convention: `references/`, `templates/`, `scripts/`, `assets/` — no ad-hoc subdirectories
+- `source:` field present for skills synced from external repos
 
 Common rejection causes (from skill-architect):
 - `tools:` instead of `allowed-tools:` — silently ignored
 - YAML list in `allowed-tools:` — parse error; use comma-separated
 - Brackets in `allowed-tools:` — parse error; no `[ ]`
-- Invalid keys (`triggers`, `outputs`, `integrates_with`) — silently ignored
+- Invalid keys (`outputs`, `integrates_with`) — silently ignored
 - Name with spaces/uppercase — may fail matching
 - Name doesn't match directory — activation mismatch
+- `category:` at top level instead of `metadata.hermes.category` — silently ignored by Hermes
+- `tags:` only at top level without `metadata.hermes.tags` — works but misses Hermes grouping
 
 ---
 

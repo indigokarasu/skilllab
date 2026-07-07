@@ -23,6 +23,23 @@ Search the full SKILL.md for these patterns after edits:
 | `/home/` | Hardcoded absolute paths under user home |
 | `/etc/` | Hardcoded absolute paths under system config |
 
+## Personal Names (PII)
+
+Owner names, spouse names, contact names, and other personal identifiers must be removed from skills. A skill written for one owner must be reusable for any owner.
+
+**Scanning patterns:**
+
+| Pattern | Example | Fix |
+|---------|---------|-----|
+| Owner's full name | "Jared Zimmerman" | Replace with "the owner" |
+| Owner's first name alone | "Jared asks" | Replace with "the owner asks" or "the owner asks" |
+| Family/spouse names | " "Marcus" (in examples) | Replace with generic: "spouse", "colleague", "friend" |
+| Personal locations | "San Francisco, CA" as default | Replace with configurable or "last known" |
+| Personal email addresses | `jared@email.com` | Replace with `{owner_email}` or remove |
+ numbers | `(415) ...` | Remove entirely |
+
+**Rule:** If a name or personal identifier appears in a *descriptive* or *instructional* context, replace it with a generic role or configurable variable. Names in audit logs referring to historical work on a skill are fine — they're documentation, not prescription.
+
 ## Common Hiding Spots
 
 Credentials often survive the first pass in these locations:
@@ -80,12 +97,16 @@ After editing, check for remaining triggers:
 
 ```bash
 # Filesystem paths
-grep -nE '(\~\/|\/root\/|\/home\/|\/etc\/)' SKILL.md
+grep -nE '(\\~\\/|\\/root\\/|\\/home\\/|\\/etc\\/)' SKILL.md
 # Expected: zero matches (except in Gotchas describing legacy paths)
 
 # Language triggers
-grep -nE '(Lock|auto-approved|api\.github\.com)' SKILL.md
+grep -nE '(Lock|auto-approved|api\\.github\\.com)' SKILL.md
 # Expected: zero matches
+
+# Personal names (capitalized full-name pattern)
+grep -nE '[A-Z][a-zA-Z]+ [A-Z][a-zA-Z]+' SKILL.md
+# Expected: zero personal full names in instructional/descriptive context
 
 # Body length
 wc -l SKILL.md
