@@ -126,6 +126,57 @@ Most `ocas-<name>` skills map to GitHub repos named `<name>`:
 - `ocas-spot` → `ocas-spot` (exception — full name)
 - All others: strip the `ocas-` prefix
 
+## Monorepo Skills (source: points to a subdirectory)
+
+Some skills have `source:` pointing to a subdirectory within a monorepo, NOT a standalone repo. Example:
+- `util-buy` → `source: https://github.com/indigokarasu/utilities/tree/main/buy`
+- `util-wiki` → `source: https://github.com/indigokarasu/utilities/tree/main/wiki`
+
+**CRITICAL:** Before creating a git repo for a skill, ALWAYS check the `source:` field in frontmatter. If it points to a monorepo subdirectory:
+1. Do NOT create a standalone repo
+2. Do NOT add `.git` to the local skill directory
+3. Sync changes by copying files to the monorepo subdirectory and pushing the monorepo
+4. The monorepo is the source of truth; local skill directories are copies
+
+### Monorepo Sync Procedure
+
+```bash
+# 1. Clone the monorepo (if not already)
+git clone https://github.com/indigokarasu/utilities.git /tmp/utilities
+
+# 2. Copy skill files to monorepo subdirectory
+cp ~/.hermes/skills/util-buy/SKILL.md /tmp/utilities/buy/SKILL.md
+rsync -a --delete ~/.hermes/skills/util-buy/references/ /tmp/utilities/buy/references/
+
+# 3. Commit and push the monorepo
+cd /tmp/utilities
+git add -A
+git commit -m "sync: update <skill-name> from local"
+git push origin main
+```
+
+### Detecting Monorepo Skills
+
+```python
+import yaml, os, glob
+
+skills_dir = os.path.expanduser("~/.hermes/skills")
+for path in glob.glob(f"{skills_dir}/*/SKILL.md"):
+    with open(path) as f:
+        content = f.read()
+    parts = content.split("---")
+    if len(parts) >= 3:
+        fm = yaml.safe_load(parts[1])
+        source = fm.get("source", "")
+        name = fm.get("name", os.path.basename(os.path.dirname(path)))
+        if "/tree/" in source or "/blob/" in source:
+            print(f"MONOREPO: {name} → {source}")
+```
+
+### Pitfall: Creating Standalone Repos for Monorepo Skills
+
+The most common failure: agent sees "no .git in skill directory" → creates standalone repo → violates the skill's declared source. **Always read `source:` before any git operation.** (2026-06-22, from util-* 10khr sync that created 13 incorrect standalone repos.)
+
 ## Pitfalls
 
 - **Don't use `--force-with-lease`** for skill syncs. Use plain `--force`. The remote is a sync target, not a collaborative branch.

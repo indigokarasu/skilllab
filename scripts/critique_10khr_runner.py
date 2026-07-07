@@ -2,25 +2,28 @@
 """
 10khr_runner.py — Autonomous skill improvement engine.
 
-Grinds on the lowest-scoring ocas-* skill until it hits 50/50,
+Grinds on the lowest-scoring ocas-* / util-* skill until it hits 50/50,
 then moves to the next one. After every 5 skills improved, re-runs
 the full library assessment.
 
 Usage:
-    python3 10khr_runner.py [--skills-dir <dir>] [--report-only]
+    python3 10khr_runner.py [--skills-dir <dir>] [--report-only] [--all-profiles]
 
 Workflow:
-    1. Find all ocas-* skills
+    1. Find all ocas-* and util-* skills across the entire skill library
     2. Score each using the critique rubric (via agent invocation)
     3. Sort by score (lowest first)
-  4. For each skill below 50/50:
+    4. For each skill below 50/50:
         a. Run critique.iterate until 50/50
         b. Log learnings to journal
-  5. After every 5 skills, re-assess entire library
+    5. After every 5 skills, re-assess entire library
     6. Update the learning journal with new patterns discovered
 
-State tracked in:
-    ~/.hermes/skills/ocas-critique/commons/data/ocas-critique/10khr-state.json
+Directory discovery:
+    By default, scans the active profile's skills directory and all subdirectories.
+    With --all-profiles, scans all profiles under ~/.hermes/profiles/.
+    Always uses recursive glob — skills may live at any depth (e.g.,
+    infrastructure/util-vps-cleanup, software-development/ocas-10xeng).
 """
 
 import json
@@ -31,13 +34,15 @@ from datetime import datetime, timezone
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
-SKILLS_DIR = os.path.expanduser("~/.hermes/skills")
-OCAS_PREFIX = "ocas-"
+# Default: scan the indigo profile (active profile) recursively
+# Resolve against HERMES_ROOT or /root/.hermes to avoid broken ~ expansion
+# when HOME is set to a profile chroot (e.g., /root/.hermes/profiles/indigo/home)
+_HERMES_ROOT = os.environ.get("HERMES_ROOT", "/root/.hermes")
+DEFAULT_SKILLS_DIR = os.path.join(_HERMES_ROOT, "profiles", "indigo", "skills")
+DEFAULT_PROFILE_SKILLS_DIR = os.path.join(_HERMES_ROOT, "skills")
 TARGET_SCORE = 50
 REASSESS_INTERVAL = 5  # re-score full library after N skills improved
-STATE_FILE = os.path.expanduser(
-    "~/.hermes/skills/ocas-critique/commons/data/ocas-critique/10khr-state.json"
-)
+STATE_FILE = os.path.join(_HERMES_ROOT, "skills", "ocas-critique", "commons", "data", "ocas-critique", "10khr-state.json")
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -63,73 +68,122 @@ def save_state(state: dict):
         json.dump(state, f, indent=2)
 
 
-def find_ocas_skills(skills_dir: str = None) -> list[str]:
-    """Return sorted list of ocas-* skill directory paths."""
-    if skills_dir is None:
-        skills_dir = SKILLS_DIR
-    skills = []
-    # Top-level ocas-* dirs
-    for d in sorted(glob.glob(os.path.join(skills_dir, f"{OCAS_PREFIX}*/SKILL.md"))):
-        skills.append(os.path.dirname(d))
-    # Subdirectory ocas-* dirs (infrastructure/, ocas/)
-    for d in sorted(glob.glob(os.path.join(skills_dir, "*/", f"{OCAS_PREFIX}*/SKILL.md"))):
-        skills.append(os.path.dirname(d))
-    return skills
+def find_all_skills(skills_dir: str = None, all_profiles: bool = False) -> list:
+    """
+    Return sorted list of (name, path) tuples for all ocas-* and util-* skills.
+
+    Uses recursive glob to find skills at any depth:
+      - ~/.hermes/profiles/indigo/skills/ocas-foo/SKILL.md
+      - ~/.hermes/profiles/indigo/skills/infrastructure/util-bar/SKILL.md
+      - ~/.hermes/profiles/koda/skills/software-development/ocas-baz/SKILL.md
+
+    Deduplicates by skill name (first found wins).
+    """
+    search_roots = []
+
+    if all_profiles:
+        # Scan all profiles under ~/.hermes/profiles/
+        profiles_dir = os.path.expanduser("~/.hermes/profiles")
+        if os.path.isdir(profiles_dir):
+            for profile in sorted(os.listdir(profiles_dir)):
+                profile_skills = os.path.join(profiles_dir, profile, "skills")
+                if os.path.isdir(profile_skills):
+                    search_roots.append(profile_skills)
+        # Also include the default profile
+        if os.path.isdir(DEFAULT_PROFILE_SKILLS_DIR):
+            search_roots.append(DEFAULT_PROFILE_SKILLS_DIR)
+    elif skills_dir:
+        search_roots.append(skills_dir)
+    else:
+        # Default: active profile + default profile
+        search_roots.append(DEFAULT_SKILLS_DIR)
+        if os.path.isdir(DEFAULT_PROFILE_SKILLS_DIR):
+            search_roots.append(DEFAULT_PROFILE_SKILLS_DIR)
+
+    seen = set()
+    seen_realpaths = set()
+    results = []
+
+    for root in search_roots:
+        # Resolve the root to its real path to avoid symlink duplicates
+        real_root = os.path.realpath(root)
+        if real_root in seen_realpaths:
+            continue
+        seen_realpaths.add(real_root)
+
+        # Recursive glob: finds SKILL.md at any depth
+        for path in sorted(glob.glob(f"{root}/**/SKILL.md", recursive=True)):
+            real_path = os.path.realpath(path)
+            name = os.path.basename(os.path.dirname(real_path))
+            # Only include ocas-* and util-* prefixed skills
+            if not (name.startswith("ocas-") or name.startswith("util-")):
+                continue
+            if name in seen:
+                continue
+            if ".archive" in real_path:
+                continue
+            seen.add(name)
+            results.append((name, real_path))
+
+    return results
 
 
-def score_skill(skill_path: str) -> dict:
+def score_skill(skill_name: str, skill_path: str) -> dict:
     """
     Score a skill by reading its SKILL.md and evaluating the 10 rubric dimensions.
     Returns a dict with scores per dimension and total.
     This is a local heuristic score — the agent does the real scoring via critique.assess.
     """
-    skill_md = os.path.join(skill_path, "SKILL.md")
-    if not os.path.exists(skill_md):
+    if not os.path.exists(skill_path):
         return {"total": 0, "dimensions": {}, "error": "SKILL.md not found"}
 
-    with open(skill_md) as f:
+    with open(skill_path) as f:
         content = f.read()
     lines = content.split("\n")
 
     scores = {}
-    skill_name = os.path.basename(skill_path)
 
     # ── D1: Frontmatter ──
     d1 = 5
-    if "name:" not in content[:500]:
+    try:
+        import yaml
+        parts = content.split("---")
+        if len(parts) >= 3:
+            fm = yaml.safe_load(parts[1]) or {}
+        else:
+            fm = {}
+            d1 -= 2
+    except Exception:
+        fm = {}
+        d1 -= 3
+
+    if not fm.get("name"):
         d1 -= 2
-    if "description:" not in content[:500]:
+    if not fm.get("description"):
         d1 -= 2
-    if "license:" not in content[:500]:
+    if "license" not in content[:500].lower():
         d1 -= 1
-    if "includes:" not in content[:2000] and os.path.isdir(os.path.join(skill_path, "references")):
+    skill_dir = os.path.dirname(skill_path)
+    has_refs = os.path.isdir(os.path.join(skill_dir, "references"))
+    if has_refs and "includes" not in str(fm):
         d1 -= 1
-    if "metadata:" not in content[:2000]:
-        d1 -= 0  # optional
     scores["D1"] = max(1, d1)
 
     # ── D2: Description quality ──
-    d2 = 3  # baseline: has description
-    desc_match = None
-    for line in lines[:20]:
-        if "description:" in line.lower():
-            # Check if it's a block scalar
-            if ">" in line or "|" in line:
-                d2 += 1
-            break
-    # Check for NOT clause
-    if "not for" in content[:1000].lower():
+    d2 = 3
+    desc = str(fm.get("description", ""))
+    if len(desc) > 50:
         d2 += 1
-    # Check for trigger keywords
-    if "trigger" in content[:1000].lower():
+    if "not for" in desc.lower() or "NOT for" in desc:
         d2 += 1
+    if fm.get("triggers"):
+        d2 = min(5, d2 + 1)
     scores["D2"] = min(5, d2)
 
     # ── D3: Conciseness (code ratio) ──
-    from critique_code_ratio import measure_code_ratio
-    ratio_result = measure_code_ratio(skill_md)
-    ratio = ratio_result["ratio"]
-    total = ratio_result["total_lines"]
+    total_lines = len(lines)
+    code_lines = sum(1 for l in lines if l.strip().startswith("```"))
+    ratio = (code_lines / total_lines * 100) if total_lines > 0 else 0
     if ratio < 15:
         d3 = 5
     elif ratio < 20:
@@ -138,18 +192,17 @@ def score_skill(skill_path: str) -> dict:
         d3 = 3
     else:
         d3 = 2
-    # Line count penalty
-    if total > 450:
+    if total_lines > 450:
         d3 = max(1, d3 - 1)
     scores["D3"] = d3
 
     # ── D4: Structure ──
     d4 = 3
-    if os.path.isdir(os.path.join(skill_path, "references")):
+    if has_refs:
         d4 += 1
-    if "support file map" in content.lower() or "when to read" in content.lower():
+    if "when to read" in content.lower():
         d4 += 1
-    if total < 400:
+    if total_lines < 400:
         d4 = min(5, d4 + 1)
     scores["D4"] = min(5, d4)
 
@@ -164,10 +217,13 @@ def score_skill(skill_path: str) -> dict:
     scores["D5"] = min(5, d5)
 
     # ── D6: Freedom calibration ──
-    d6 = 4  # most skills are well-calibrated
-    if "rules:" in content.lower() and "exact" in content.lower():
-        d6 = 5
-    scores["D6"] = d6
+    d6 = 4
+    content_lower = content.lower()
+    if "why" in content_lower or "because" in content_lower:
+        d6 += 1
+    if "default" in content_lower or "override" in content_lower:
+        d6 = min(5, d6)
+    scores["D6"] = min(5, d6)
 
     # ── D7: Error handling ──
     d7 = 3
@@ -179,7 +235,7 @@ def score_skill(skill_path: str) -> dict:
 
     # ── D8: Progressive disclosure ──
     d8 = 3
-    ref_dir = os.path.join(skill_path, "references")
+    ref_dir = os.path.join(skill_dir, "references")
     if os.path.isdir(ref_dir):
         ref_files = [f for f in os.listdir(ref_dir) if f.endswith(".md")]
         if len(ref_files) >= 3:
@@ -189,12 +245,11 @@ def score_skill(skill_path: str) -> dict:
     scores["D8"] = min(5, d8)
 
     # ── D9: Scripts quality ──
-    script_dir = os.path.join(skill_path, "scripts")
+    script_dir = os.path.join(skill_dir, "scripts")
     if os.path.isdir(script_dir):
         scripts = [f for f in os.listdir(script_dir) if f.endswith((".py", ".sh"))]
         if scripts:
-            d9 = 4  # has scripts, assume decent
-            # Check for --help or usage
+            d9 = 4
             for s in scripts[:3]:
                 sp = os.path.join(script_dir, s)
                 with open(sp) as sf:
@@ -204,7 +259,7 @@ def score_skill(skill_path: str) -> dict:
                     break
             scores["D9"] = d9
         else:
-            scores["D9"] = 4  # empty scripts dir
+            scores["D9"] = 4
     else:
         scores["D9"] = 5  # N/A — no scripts needed
 
@@ -214,8 +269,6 @@ def score_skill(skill_path: str) -> dict:
         d10 += 1
     if "when not to use" in content.lower():
         d10 += 1
-    if "update" in content.lower() and "command" in content.lower():
-        d10 = min(5, d10 + 1)
     scores["D10"] = min(5, d10)
 
     total_score = sum(scores.values())
@@ -224,25 +277,24 @@ def score_skill(skill_path: str) -> dict:
         "path": skill_path,
         "total": total_score,
         "dimensions": scores,
-        "line_count": total,
+        "line_count": total_lines,
         "code_ratio": round(ratio, 1),
         "scored_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
-def run_full_assessment(skills_dir: str = None) -> list[dict]:
-    """Score all ocas-* skills and return sorted list (lowest first)."""
-    skills = find_ocas_skills(skills_dir)
+def run_full_assessment(skills_dir: str = None, all_profiles: bool = False) -> list:
+    """Score all ocas-* / util-* skills and return sorted list (lowest first)."""
+    skills = find_all_skills(skills_dir, all_profiles)
     results = []
-    for sp in skills:
-        result = score_skill(sp)
+    for name, path in skills:
+        result = score_skill(name, path)
         results.append(result)
     results.sort(key=lambda r: r["total"])
     return results
 
 
-
-def generate_report(assessment: list[dict], state: dict) -> str:
+def generate_report(assessment: list, state: dict) -> str:
     """Generate a text report of current library state."""
     lines = [
         f"# 10khr Report — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
@@ -276,28 +328,31 @@ def generate_report(assessment: list[dict], state: dict) -> str:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="10khr skill improvement engine")
-    parser.add_argument("--skills-dir", default=os.path.expanduser("~/.hermes/skills"),
-                        help="Path to skills directory")
+    parser.add_argument("--skills-dir", default=None,
+                        help="Path to skills directory (default: active profile)")
+    parser.add_argument("--all-profiles", action="store_true",
+                        help="Scan all profiles under ~/.hermes/profiles/")
     parser.add_argument("--report-only", action="store_true",
                         help="Only assess, don't output grinding target")
     args = parser.parse_args()
 
     report_only = args.report_only
     skills_dir = args.skills_dir
+    all_profiles = args.all_profiles
     state = load_state()
 
     if not state.get("started_at"):
         state["started_at"] = datetime.now(timezone.utc).isoformat()
 
     # Step 1: Full assessment
-    assessment = run_full_assessment(skills_dir)
+    assessment = run_full_assessment(skills_dir, all_profiles)
     state["last_run"] = datetime.now(timezone.utc).isoformat()
 
     # Step 2: Find lowest-scoring skill below target
     below_target = [r for r in assessment if r["total"] < TARGET_SCORE]
 
     if not below_target:
-        print("All ocas-* skills are at 50/50. Nothing to grind.")
+        print("All ocas-* / util-* skills are at 50/50. Nothing to grind.")
         print(generate_report(assessment, state))
         save_state(state)
         return
@@ -312,8 +367,6 @@ def main():
         return
 
     # Step 3: Output the target for the agent to work on
-    # The actual fix work is done by the agent via critique.iterate
-    # This script identifies WHAT to work on; the agent does the HOW
     print(f"TARGET: {target['skill']} ({target['total']}/50)")
     print(f"PATH: {target['path']}")
     print(f"DIMENSIONS: {json.dumps(target['dimensions'], indent=2)}")
