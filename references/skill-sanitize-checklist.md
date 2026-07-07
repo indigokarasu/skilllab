@@ -23,6 +23,30 @@ Search the full SKILL.md for these patterns after edits:
 | `/home/` | Hardcoded absolute paths under user home |
 | `/etc/` | Hardcoded absolute paths under system config |
 
+## High-Severity Live-Secret Patterns (must never be committed)
+
+These are concrete regexes for real credential formats. The sanitize function
+(`scripts/skilllab.py` → `sanitize_skill`) auto-detects and replaces them with
+**env-var references** — the literal value is never stored in the skill.
+
+| Pattern (regex) | Secret | Env-var replacement |
+|-----------------|--------|---------------------|
+| `sk_live_[A-Za-z0-9_]+` | Stripe **live** secret key (CRITICAL — real money) | `${STRIPE_LIVE_SECRET_KEY}` |
+| `sk-[A-Za-z0-9]{20,}` | OpenAI API key | `${OPENAI_API_KEY}` |
+| `ya29\.[A-Za-z0-9_-]+` | Google OAuth access token | `${OAUTH_ACCESS_TOKEN}` |
+| `[A-Za-z0-9_-]+\.apps\.googleusercontent\.com` | Google OAuth client ID | `${GOOGLE_OAUTH_CLIENT_ID}` |
+| `client_secret\s*[:=]\s*["'][A-Za-z0-9._-]{8,}["']` | OAuth client secret (quoted literal) | `client_secret=${GOOGLE_OAUTH_CLIENT_SECRET}` |
+| `gh[pousr]_[A-Za-z0-9]{20,}` | GitHub token | `${GITHUB_TOKEN}` |
+| `xox[baprs]-[A-Za-z0-9-]+` | Slack token | `${SLACK_TOKEN}` |
+| `AIza[0-9A-Za-z_-]{20,}` | Google API key | `${GOOGLE_API_KEY}` |
+| `AKIA[0-9A-Z]{16}` | AWS access key ID | `${AWS_ACCESS_KEY_ID}` |
+
+**Replacement convention:** detected secrets become `${ENV_VAR}` references. The
+real value is supplied at runtime from the environment or credential store — e.g.
+`os.environ['STRIPE_LIVE_SECRET_KEY']` — never as a literal in a skill file.
+Rotate any secret that was ever committed; purging it from git history alone is not
+sufficient (see `references/skill-publish-github-push-recipe.md` history-purge step).
+
 ## Personal Names (PII)
 
 Owner names, spouse names, contact names, and other personal identifiers must be removed from skills. A skill written for one owner must be reusable for any owner.
