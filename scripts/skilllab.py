@@ -3,6 +3,7 @@
 
 import curses
 import os
+import re
 import sys
 import yaml
 
@@ -142,6 +143,63 @@ def parse_frontmatter(path):
 
 
 # ─── TUI screens ─────────────────────────────────────────────────────────────
+
+# ─── Secret sanitization (extract inline credentials to env-var references) ──
+
+# (compiled pattern, replacement) — replacement may be a string or a function
+SECRET_PATTERNS = [
+    (re.compile(r'sk_live_[A-Za-z0-9_]+'), '${STRIPE_LIVE_SECRET_KEY}'),
+    (re.compile(r'sk-[A-Za-z0-9]{20,}'), '${OPENAI_API_KEY}'),
+    (re.compile(r'ya29\.[A-Za-z0-9_-]+'), '${OAUTH_ACCESS_TOKEN}'),
+    (re.compile(r'([A-Za-z0-9_-]+)\.apps\.googleusercontent\.com'),
+     lambda m: '${GOOGLE_OAUTH_CLIENT_ID}.apps.googleusercontent.com'),
+    (re.compile(r'(client_secret\s*[:=]\s*["\'])([A-Za-z0-9._\-]{8,})(["\'])'),
+     lambda m: m.group(1) + '${GOOGLE_OAUTH_CLIENT_SECRET}' + m.group(3)),
+    (re.compile(r'gh[pousr]_[A-Za-z0-9]{20,}'), '${GITHUB_TOKEN}'),
+    (re.compile(r'xox[baprs]-[A-Za-z0-9-]+'), '${SLACK_TOKEN}'),
+    (re.compile(r'AIza[0-9A-Za-z_-]{20,}'), '${GOOGLE_API_KEY}'),
+    (re.compile(r'AKIA[0-9A-Z]{16}'), '${AWS_ACCESS_KEY_ID}'),
+]
+
+# File types the sanitizer touches
+_SANITIZE_EXTS = {'.md', '.py', '.json', '.yaml', '.yml', '.txt', '.sh', '.toml'}
+
+
+def sanitize_skill(name, skill_dir):
+    """Scan a skill directory for inline secrets and replace them with
+    env-var references (e.g. ${STRIPE_LIVE_SECRET_KEY}). Returns a summary
+    dict mapping relative file path -> {pattern: replacement_count}."""
+    import glob as _glob
+
+    # Never sanitize the skilllab tooling itself (it documents these patterns)
+    if os.path.basename(skill_dir.rstrip('/')) == 'ocas-skilllab':
+        return {}
+
+    summary = {}
+    for path in sorted(_glob.glob(os.path.join(skill_dir, '**', '*'), recursive=True)):
+        if not os.path.isfile(path):
+            continue
+        if os.path.splitext(path)[1].lower() not in _SANITIZE_EXTS:
+            continue
+        if '/.git/' in path or '/.archive/' in path:
+            continue
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except (UnicodeDecodeError, OSError):
+            continue
+        original = content
+        counts = {}
+        for pat, repl in SECRET_PATTERNS:
+            content, n = pat.subn(repl, content)
+            if n:
+                counts[pat.pattern] = counts.get(pat.pattern, 0) + n
+        if content != original:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            summary[os.path.relpath(path, skill_dir)] = counts
+    return summary
+
 
 def draw_menu(stdscr):
     """Main menu screen. Returns selected action string or None."""
