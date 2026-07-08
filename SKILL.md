@@ -48,6 +48,9 @@ triggers:
   - improve skill
   - cross-profile skills
   - koda skills
+  - secret scan
+  - scan skill for secrets
+  - credential leak
 ---
 
 # skilllab
@@ -69,6 +72,7 @@ When invoked interactively, present a menu using the `clarify` tool: Audit, Crit
 5. [Rename Procedure](#5-rename-procedure)
 6. [Publish Procedure](#6-publish-procedure)
 7. [Sanitize Procedure](#7-sanitize-procedure)
+7b. [Secret Scan Gate](#7b-secret-scan-gate)
 8. [Frontmatter Standards](#8-frontmatter-standards)
 9. [Pitfalls](#9-pitfalls)
 10. [External Tool Evaluation & Integration](#10-external-tool-evaluation--integration)
@@ -99,7 +103,7 @@ When invoked interactively, present a menu using the `clarify` tool: Audit, Crit
 
 ## 2. Audit Procedure
 
-Audit checklist: (1) Check for auto-generated skills (`generated_by` in frontmatter), (2) Check author coverage (use YAML parser, not grep), (3) Check for YAML errors (unescaped markdown, bare `---`), (4) Check for empty profile stubs, (5) Check SOUL repo install gap, (6) Check orphaned reference files, (7) Check support file map completeness. See `references/audit-2026-06-18.md` for the full audit results.
+Audit checklist: (1) Check for auto-generated skills (`generated_by` in frontmatter), (2) Check author coverage (use YAML parser, not grep), (3) Check for YAML errors (unescaped markdown, bare `---`), (4) Check for empty profile stubs, (5) Check SOUL repo install gap, (6) Check orphaned reference files, (7) Check support file map completeness, (8) Run the secret-scan gate (`scripts/secret-scan.sh <dir>` — must exit 0 / CLEAN). See `references/audit-2026-06-18.md` for the full audit results.
 
 ---
 
@@ -342,7 +346,7 @@ See `references/skill-publish-agentskill-evaluation-criteria.md` for the agentsk
 
 ## 6a. Share Procedure — Submit to Nous Research Optional Skills
 
-Use when the user says "share this skill", "submit to Nous", "publish to optional-skills", or "contribute this skill". Prerequisites: score ≥45/50, `description` ≤ 60 chars, no PII/credentials, test file exists. Steps: prepare submission dir → copy files → clean frontmatter → verify no PII → run tests → py_compile scripts → commit to fork → create PR. See `references/skill-publish-nous.md` for the full procedure.
+Use when the user says "share this skill", "submit to Nous", "publish to optional-skills", or "contribute this skill". Prerequisites: score ≥45/50, `description` ≤ 60 chars, no PII/credentials, **`scripts/secret-scan.sh` exits 0 (CLEAN)**, test file exists. Steps: prepare submission dir → copy files → clean frontmatter → verify no PII → run tests → py_compile scripts → commit to fork → create PR. See `references/skill-publish-nous.md` for the full procedure.
 
 ---
 - `research/` — Academic search, data analysis, OSINT
@@ -370,6 +374,36 @@ Use when the user says "share this skill", "submit to Nous", "publish to optiona
 - **No user data:** Never include the user's name, email, paths, or personal config in the submitted skill. All paths should be generic (`~/.hermes/`, `/root/`, etc.).
 
 See `references/skill-sanitize-checklist.md` for the full sanitize procedure.
+
+---
+
+## 7b. Secret Scan Gate
+
+**Policy (2026-07-07):** No secrets in local/remote skills except the private backup repo; even there, secrets belong in the correct env file, not in skills.
+
+A skill is NOT committable or publishable until `scripts/secret-scan.sh <dir>` exits 0 (CLEAN). Run it as a gate in Audit, Sanitize, Publish, and Share.
+
+### Run it
+```bash
+bash scripts/secret-scan.sh /path/to/skill
+```
+Scans working tree, `.git/config`, and **entire git history** (all revisions). Output is masked; exits 1 if any potential secret is found.
+
+### Remediation
+- **Working tree:** redact/remove the secret, commit the fix.
+- **Token in remote URL (`.git/config`):** strip it — git authenticates via the `gh` credential helper, so `https://user:****@github.com/...` is redundant AND a leak. `git remote set-url origin https://github.com/owner/repo.git`.
+- **Secret in history:** rewrite. `git-filter-repo` is broken on this host (missing module) — use `git filter-branch`:
+  ```bash
+  git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch <path>' --prune-empty -- --all
+  git for-each-ref --format='%(refname)' refs/original/ | xargs -n1 git update-ref -d
+  git reflog expire --expire=now --all && git gc --prune=now
+  git push --force
+  ```
+  Verify: `git log --all -p | grep -c '<secret>'` → 0.
+- **Live credential still valid (PAT/API key):** scrubbing history does NOT invalidate it. Rotate/revoke at the provider (GitHub PATs: Settings → Developer settings → PATs; classic PATs can't be API-revoked).
+
+### False positives
+Instructional/example text (e.g. `https://user:****@github.com/...` inside a *detection guide*) is secret-shaped but not a real secret. Redact the example or move it to a reference if it trips the gate repeatedly. The scanner script `scripts/secret-scan.sh` is auto-excluded (it contains detection patterns by design).
 
 ---
 
@@ -409,6 +443,7 @@ When a capability is retired: (1) `grep -r "old-name"` across all skill dirs, (2
 | `references/skill-publish-github-sync-existing-skills.md` | When bulk-syncing local skills to existing GitHub repos |
 | `references/skill-publish-agentskill-evaluation-criteria.md` | When evaluating skill quality/security scores |
 | `references/skill-sanitize-checklist.md` | Post-sanitize verification checklist + scanner false-positives |
+| `scripts/secret-scan.sh` | Secret-scan gate — scans working tree + .git/config + full history; exits 1 if secrets found |
 | `references/mempalace-gotchas.md` | MemPalace MCP tool constraints — kg_add character rejections, drawer vs. KG guidance |
 | `references/audit-2026-06-05.md` | June 2026 audit — git merge conflict repair, cross-profile write guard, remaining author gaps |
 | `references/audit-2026-06-18.md` | June 2026 audit — full library scan, 94 skills, 26 missing authors, YAML errors, orphaned refs |
