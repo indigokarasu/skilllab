@@ -82,8 +82,13 @@ def find_all_skills(skills_dir: str = None, all_profiles: bool = False) -> list:
     search_roots = []
 
     if all_profiles:
-        # Scan all profiles under ~/.hermes/profiles/
-        profiles_dir = os.path.expanduser("~/.hermes/profiles")
+        # Scan all profiles under <HERMES_ROOT>/profiles/
+        # Use HERMES_ROOT (NOT expanduser("~/.hermes/profiles")): under a profile
+        # chroot (HOME=/root/.hermes/profiles/<profile>/home) expanduser resolves to
+        # the active profile's home, silently dropping every OTHER profile (e.g. koda).
+        # Confirmed bug 2026-07-15 — --all-profiles reported 60 skills and missed
+        # koda/ocas-eng-debug until this was fixed.
+        profiles_dir = os.path.join(_HERMES_ROOT, "profiles")
         if os.path.isdir(profiles_dir):
             for profile in sorted(os.listdir(profiles_dir)):
                 profile_skills = os.path.join(profiles_dir, profile, "skills")
@@ -249,14 +254,26 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
     if os.path.isdir(script_dir):
         scripts = [f for f in os.listdir(script_dir) if f.endswith((".py", ".sh"))]
         if scripts:
-            d9 = 4
-            for s in scripts[:3]:
+            # Scan ALL scripts (not just the first 3) for --help/usage/argparse.
+            # Sampling only the first 3 hides real gaps when most scripts lack --help
+            # (e.g. a 19-script skill with 7 missing --help still scored D9=5 because
+            # the first 3 happened to have it). Confirmed gap 2026-07-14.
+            missing_help = []
+            for s in scripts:
                 sp = os.path.join(script_dir, s)
-                with open(sp) as sf:
-                    sc = sf.read()
-                if "--help" in sc or "usage" in sc.lower() or "argparse" in sc:
-                    d9 = 5
-                    break
+                try:
+                    with open(sp) as sf:
+                        sc = sf.read()
+                except Exception:
+                    continue
+                if "--help" not in sc and "usage" not in sc.lower() and "argparse" not in sc:
+                    missing_help.append(s)
+            if not missing_help:
+                d9 = 5
+            elif len(missing_help) < len(scripts) / 2:
+                d9 = 4
+            else:
+                d9 = 3
             scores["D9"] = d9
         else:
             scores["D9"] = 4
