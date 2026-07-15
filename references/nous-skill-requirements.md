@@ -13,11 +13,44 @@ Key requirements from the official docs that skilllab should enforce during audi
 ### Hermes-Specific Metadata (`metadata.hermes`)
 - `tags: [str]` — array of tag strings for `skills_list` grouping
 - `category: str` — controls `skills_list` category grouping. Must be a recognized category
-- `config: [{key, description, default}]` — env var declarations for `hermes config migrate/show`
+- `config: [{key, description, default}]` — **declares behavioral config keys** surfaced by `hermes config migrate/show`. Despite the historical "env var" wording in older docs, these keys are NOT environment variables. They are stored under `skills.config.<key>` in `config.yaml` and read by the skill at runtime (see Configuration Policy below).
 - `fallback_for_toolsets: [str]` — conditional activation (show when toolset unavailable)
 - `requires_toolsets: [str]` — conditional activation (show when toolset available)
 - `fallback_for_tools: [str]` — same, for individual tools
 - `requires_tools: [str]` — same, for individual tools
+
+### Configuration Policy (MANDATORY — enforced at submission)
+
+**Behavioral settings (thresholds, retention windows, feature flags, display prefs, paths) MUST NOT be read from environment variables.** This is the standing `env-var-for-config` policy in the Hermes `AGENTS.md` Contribution Rubric. The hermes-sweeper auto-closes PRs that tell users to "set `X` in your `.env`" or read non-secret config from `GENIE_*`/`HERMES_*`-style env vars.
+
+Correct mechanism (the standard all OCAS skills must follow):
+
+1. **Declare** each behavioral setting in frontmatter under `metadata.hermes.config` with a logical key (e.g. `genie.snapshot_max_age_days`). The storage key becomes `skills.config.genie.snapshot_max_age_days`.
+2. **Read** values at runtime from `$HERMES_HOME/config.yaml` under `skills.config.<key>`, falling back to the declared default when unset. Use PyYAML (Hermes already ships it). The shipped `telephony.py` optional-skill is the reference implementation.
+3. **Document** the `skills.config.<key>` keys in the SKILL.md Configuration section. Never document env-var names (`GENIE_*`, etc.) as the user-facing control.
+4. **Override** via CLI flags where a runtime override is useful (e.g. `--dry-run`), which take precedence over config.yaml.
+5. **Environment variables are only acceptable for:** (a) secrets/credentials (and those go in `.env`, declared via `required_environment_variables`), or (b) locating the runtime (`HERMES_HOME`, `HERMES_PROFILE`) — never for behavioral tuning.
+
+Anti-pattern (rejects the PR):
+```python
+# WRONG — sweeper closes this
+threshold = int(os.environ.get("GENIE_SNAPSHOT_MAX_AGE_DAYS", 7))
+```
+Correct pattern:
+```python
+# RIGHT — reads config.yaml, falls back to default
+def _skill_config(key, default):
+    node = _load_root_config()  # yaml.safe_load($HERMES_HOME/config.yaml)
+    for part in ("skills", "config", "genie", key):
+        node = node.get(part) if isinstance(node, dict) else None
+        if node is None:
+            return default
+    return node
+threshold = _skill_config("snapshot_max_age_days", 7)
+```
+
+> Note: OCAS skills historically used `GENIE_*` env vars (genie, and others that predate this policy). Before submitting any OCAS skill to the optional-skills catalog, migrate its config layer to the `skills.config.*` mechanism above. The forge audit (`forge_audit_skills.py`) and skilllab critique flag any remaining `GENIE_*`/`*_MAX_AGE_DAYS`-style env reads.
+
 
 ### Optional Fields
 - `platforms: [macos | linux | windows]` — OS restriction. Omit = all platforms
