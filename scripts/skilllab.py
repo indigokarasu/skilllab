@@ -463,4 +463,9 @@ def main():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
+        print(__doc__ or "Usage: python3 skilllab.py")
+        print("Interactive keyboard-navigable skill library manager (curses TUI).")
+        print("Run with no arguments to launch. Menu: audit/merge/rename/delete/publish/sanitize/hygiene.")
+        sys.exit(0)
     main()
