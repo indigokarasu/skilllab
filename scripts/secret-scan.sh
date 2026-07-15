@@ -4,6 +4,13 @@
 # Output is masked — full secrets are never printed.
 # Exits 0 if CLEAN, 1 if any potential secret is found (use to gate commit/publish).
 set -u
+case "${1:-}" in
+  --help|-h)
+    echo "Usage: secret-scan.sh <dir>"
+    echo "Scans <dir> working tree, .git/config, and full git history for secrets."
+    echo "Exits 0 if CLEAN, 1 if a potential secret is found, 2 if no .git present."
+    exit 0 ;;
+esac
 TARGET="${1:-.}"
 if [ ! -d "$TARGET/.git" ]; then echo "No .git in $TARGET — nothing to scan"; exit 2; fi
 RE='AKIA[0-9A-Z]{16}|gh[pousr]_[0-9A-Za-z]{36}|github_pat_[0-9A-Za-z_]{20,}|xox[baprs]-[0-9A-Za-z-]{10,}|sk-[0-9A-Za-z]{20,}|AIza[0-9A-Za-z_-]{35}|sk_live_[0-9A-Za-z]+|pk_live_[0-9A-Za-z]+|SK[0-9a-fA-F]{32}|eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.|BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY|ssh-rsa AAAAB3NzaC1|://[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]{4,}@[A-Za-z0-9.-]+'

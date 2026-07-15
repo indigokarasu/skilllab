@@ -94,9 +94,15 @@ _When grinding a skill to 50/50, use this to verify the runner will recognize yo
 
 ## D9: Scripts Quality
 
+The runner scans **ALL** scripts (not just the first 3) for `--help`/`usage`/`argparse`. First 3 only were sampled before 2026-07-14 — that hid real gaps.
+
 - No scripts directory → **5/5 (N/A)**
-- Has scripts but no `--help`/`usage`/`argparse` → **4/5**
-- Has scripts with `--help` or `usage` or `argparse` → **5/5**
+- Scripts dir present but empty → **4/5**
+- Has scripts; `missing_help` ≥ half of all scripts → **3/5**
+- Has scripts; `missing_help` < half → **4/5**
+- Has scripts; every script has `--help`/`usage`/`argparse` → **5/5**
+
+Note: the check is a literal match on the strings `--help`, `usage`, or `argparse` anywhere in the file. A hand-rolled usage block without those tokens will score as missing — confirm manually with `python3 <script> --help`.
 
 ## D10: Completeness
 
@@ -123,7 +129,7 @@ _When grinding a skill to 50/50, use this to verify the runner will recognize yo
 | D6 | 4 | +1 | "why" or "because" anywhere in content |
 | D7 | 3 | Both bonuses | "pitfall"/"gotcha" + "error"+"handling" |
 | D8 | 3 | Both bonuses | ≥3 ref files + "when to read" |
-| D9 | 5 | N/A if no scripts | Else `--help`/`usage`/`argparse` |
+| D9 | 5 | N/A if no scripts | Else scan ALL scripts: 5/5 only if every script has `--help`/`usage`/`argparse`; <half missing → 4, ≥half missing → 3; empty dir → 4 |
 | D10 | 3 | Both bonuses | "pitfall"/"gotcha" + "when not to use" |
 
 ## Common Failure Patterns
