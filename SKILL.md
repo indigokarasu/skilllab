@@ -350,7 +350,12 @@ See `references/skill-publish-agentskill-evaluation-criteria.md` for the agentsk
 
 ### GitHub Mechanics
 - Full push recipe: `references/skill-publish-github-push-recipe.md`
-- Bulk sync workflow for existing repos: `references/skill-publish-github-sync-existing-skills.md`
+- Bulk sync workflow for existing repos: `references/skill-publish-github-sync-existing-skills.md`. Automated daily sync also runs via `/root/.hermes/profiles/indigo/scripts/skill-sync-push.sh` (cron `ocas-skilllab-sync`, 04:00) — it commits+pushes all remoted skills with changes, secret-gates each repo, and sets the Indigo Karasu identity (the host global git config defaults to `Koda`, a different profile; on manual commits set `git -C <skill> config user.name "Indigo Karasu"` / `user.email "mx.indigo.karasu@gmail.com"` too). After any local skill edit, this keeps GitHub current without manual pushes.
+- **Creating a NEW private monorepo from existing skills (2026-07-15):** When the user says "make a new private monorepo with all <X> skills," COPY the skill dirs into a fresh staging dir (do NOT `mv` — leave originals in place so the agents that load them keep working). Then: (1) strip any nested `.git` inside copied trees (`rm -rf <copy>/<skill>/references/livearch/.git`) or git stores an empty **gitlink** and the real files are NOT committed — re-add and confirm with `git ls-files | grep -c livearch` > 0; (2) `git init`, set Indigo identity; (3) run `secret-scan.sh` and remediate placeholders (see masked-output pitfall above); (4) `gh repo create indigokarasu/<name> --private`; (5) `git remote add origin git@github.com:indigokarasu/<name>.git` explicitly and `git push -u origin main` — `gh repo create` does NOT auto-wire `origin` in this shell, and a bare `git push` then fails with "Could not read from remote repository." (6) Verify remote SKILL.md count == local.
+- **Do NOT ask which account to use when only one GitHub account is authenticated.** When `gh` is logged in to a single account (check: `gh auth status`), create the repo under that account. Asking "which account?" when only `indigokarasu` is available is a wasted round-trip — the user's correction: "You only have your github account, indigokarasu, so what are you asking for?" Pick the authenticated account and proceed; only ask if the user explicitly names a different one.
+- **Monorepo is the sync PUSH TARGET — never create per-skill repos for skills already under a monorepo (2026-07-15).** All `util-*` skills live in the single `indigokarasu/utilities` monorepo (subdirs named WITHOUT the `util-` prefix: `buy`, `draw`, …); `eng-*` skills live in `indigokarasu/eng-skills`. Each live skill's `source:` frontmatter already points to its monorepo subdir. So when syncing, the workflow is: clone the monorepo → copy live skill dir → monorepo subdir → commit → push `main`. Do NOT `git init` a standalone repo per skill, do NOT `gh repo create` per skill — that creates orphan repos the `source:` field doesn't reference (the user's redirect: "Util- skills have a monorepo, if there are new skills add them to the monorepo"). Always read `source:` first (rule at top of §6) before any repo operation.
+- **Unified monorepo sync action (2026-07-15):** `bash /root/.hermes/profiles/indigo/scripts/monorepo-sync.sh` copies live `util-*` (from `indigo/skills`) and `eng-*` (from both `indigo` and `koda` profiles) into their monorepos, then pushes. It: strips nested `.git`/`.bak`/pycache from each copy; sanitizes doc-URL placeholders (`<POSTGRES_URL>` / `<GITHUB_URL_WITH_TOKEN>`) so the secret gate passes; gates on `secret-scan.sh --working-tree` (NOT full-history mode — committed doc prose in `util-github` would otherwise block the push); and pushes `main`. Cron `monorepo-skill-sync` runs it daily 05:00. Three-tier sync is now: ocas-* (per-skill repos → `skill-sync-push.sh` @ 04:00), util-* + eng-* (monorepos → `monorepo-sync.sh` @ 05:00). Both set Indigo identity (host global git defaults to `Koda`). Live skills are NOT themselves git repos; the monorepos are push targets only.
+- **`secret-scan.sh --working-tree` mode (added 2026-07-15):** full-history scanning blocks legitimate pushes because pre-existing committed doc prose (example credential URLs in `util-github/credential-purge.md`, the scanner's own regex literal in `util-github/scripts/secret_scan.sh`) flags as "secret." For a SYNC gate you only care about NEW secrets in the working tree, so pass `--working-tree` (scans working tree + `.git/config`, skips `git rev-list --all`). The script excludes itself (`secret-scan.sh`/`secret_scan.sh`) from the working-tree grep. Use full mode only for pre-publish audits where history matters.
 
 ---
 
@@ -403,13 +408,14 @@ A skill is NOT committable or publishable until `scripts/secret-scan.sh <dir>` e
 
 ### Run it
 ```bash
-bash scripts/secret-scan.sh /path/to/skill
+bash scripts/secret-scan.sh /path/to/skill            # full: working tree + .git/config + ALL history
+bash scripts/secret-scan.sh --working-tree /path/to/skill   # working tree + .git/config only (skip history)
 ```
-Scans working tree, `.git/config`, and **entire git history** (all revisions). Output is masked; exits 1 if any potential secret is found.
+Scans working tree, `.git/config`, and **entire git history** (all revisions). Output is masked; exits 1 if any potential secret is found. Use `--working-tree` for sync/publish gates where pre-existing committed history would otherwise block a legitimate push (see §6 monorepo-sync note).
 
 ### Remediation
 - **Working tree:** redact/remove the secret, commit the fix.
-- **Token in remote URL (`.git/config`):** strip it — git authenticates via the `gh` credential helper, so `https://user:****@github.com/...` is redundant AND a leak. `git remote set-url origin https://github.com/owner/repo.git`.
+- **Token in remote URL (`.git/config`):** strip it — git authenticates via the `gh` credential helper, so `<GITHUB_URL_WITH_TOKEN>` is redundant AND a leak. `git remote set-url origin https://github.com/owner/repo.git`.
 - **Secret in history:** rewrite. `git-filter-repo` is broken on this host (missing module) — use `git filter-branch`:
   ```bash
   git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch <path>' --prune-empty -- --all
@@ -421,7 +427,9 @@ Scans working tree, `.git/config`, and **entire git history** (all revisions). O
 - **Live credential still valid (PAT/API key):** scrubbing history does NOT invalidate it. Rotate/revoke at the provider (GitHub PATs: Settings → Developer settings → PATs; classic PATs can't be API-revoked).
 
 ### False positives
-Instructional/example text (e.g. `https://user:****@github.com/...` inside a *detection guide*) is secret-shaped but not a real secret. Redact the example or move it to a reference if it trips the gate repeatedly. The scanner script `scripts/secret-scan.sh` is auto-excluded (it contains detection patterns by design).
+Instructional/example text (e.g. `<GITHUB_URL_WITH_TOKEN>` inside a *detection guide*) is secret-shaped but not a real secret. Redact the example or move it to a reference if it trips the gate repeatedly. The scanner script `scripts/secret-scan.sh` is auto-excluded (it contains detection patterns by design).
+
+**Scanner output is MASKED — do NOT grep the masked string.** `secret-scan.sh` masks matched credential *values* as `***` in its printed output (e.g. it prints `<POSTGRES_URL>` when the file actually contains a real postgres URL with credentials). The file holds the UNMASKED value, so grepping the working tree for `***` (or `<POSTGRES_URL>`) will NOT match and you'll falsely believe the line is already sanitized. To verify or remediate, search for the REAL (unmasked) substring. Prefer a literal `str.replace()` in Python over sed/regex — sed and perl interpolate `*`/`@`/`?` as metacharacters (even with `\\Q...\\E` in perl when the delimiter is `:`), and silently fail to substitute, leaving the file unchanged while reporting success. When a substitution won't take, confirm with `cat -A` or `hexdump -C` that the literal bytes match your needle. (2026-07-15 incident: ~6 turns wasted chasing a `***` string that never existed in the file; the real content was a postgres URL with `user:pass@localhost`.)
 
 ---
 
@@ -448,3 +456,6 @@ Retire a capability by: `grep -r "old-name"` across skill dirs → classify refe
 ## Support File Map
 
 The full file index (60+ reference and script entries, with conditional **When to read** column) lives in `references/support-file-map.md` — read it **before any skilllab operation** for the per-task pointers (D1 audit, scoring, 10khr grind, publish/share, secret gate).
+
+- `scripts/skill-sync-push.sh` — reusable sync action: commits+pushes every remoted skill with changes or unpushed commits, secret-gated, sets Indigo identity. Drives cron `ocas-skilllab-sync` (daily 04:00). `DRY_RUN=1` for a no-op report.
+- `scripts/monorepo-sync.sh` — unified monorepo sync: copies live `util-*` + `eng-*` skills into the `utilities` / `eng-skills` monorepos (strips nested `.git`/`.bak`/pycache, sanitizes doc-URL placeholders, secret-gates `--working-tree`), pushes `main`. Drives cron `monorepo-skill-sync` (daily 05:00). `DRY_RUN=1` for a no-op report.
