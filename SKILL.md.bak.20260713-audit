@@ -16,14 +16,6 @@ metadata:
   author: Indigo Karasu (indigokarasu)
   version: "3.4.2"
   merged-from: ocas-critique
-  hermes:
-    category: software-development
-    tags:
-      - skill-maintenance
-      - audit
-      - critique
-      - library-hygiene
-
 source: https://github.com/indigokarasu/skilllab
 includes:
   - references/**
@@ -69,28 +61,45 @@ The library should contain class-level instruction umbrellas — not hundreds of
 
 ## Interactive Menu
 
-When invoked interactively, present a menu using the `clarify` tool: Audit, Critique, Merge, Rename, Delete, Publish, Sanitize, Hygiene, Exit. See the Interactive Menu section in the critique procedure for the full pattern (or `references/interactive-menu.md`).
+When invoked interactively, present a menu using the `clarify` tool: Audit, Critique, Merge, Rename, Delete, Publish, Sanitize, Hygiene, Exit. See `references/clarify-interactive-menu.md` for the full pattern.
 
 ## Table of Contents
 
-The body uses flat numbered section headings (`## 1. Skill Taxonomy` … `## 11. Retired Capability Cleanup`) — they are the navigation. No separate TOC needed.
+1. [Skill Taxonomy](#1-skill-taxonomy)
+2. [Audit Procedure](#2-audit-procedure)
+3. [Critique Procedure](#3-critique-procedure)
+4. [Merge / Consolidate Procedure](#4-merge--consolidate-procedure)
+5. [Rename Procedure](#5-rename-procedure)
+6. [Publish Procedure](#6-publish-procedure)
+7. [Sanitize Procedure](#7-sanitize-procedure)
+7b. [Secret Scan Gate](#7b-secret-scan-gate)
+8. [Frontmatter Standards](#8-frontmatter-standards)
+9. [Pitfalls](#9-pitfalls)
+10. [External Tool Evaluation & Integration](#10-external-tool-evaluation--integration)
+11. [Retired Capability Cleanup](#11-retired-capability-cleanup)
 
 ---
 
 ## 1. Skill Taxonomy
 
-- `ocas-*` — OCAS family, authored by Indigo Karasu (includes library-management meta-skills).
+- `ocas-*` — OCAS family. Authored by Indigo Karasu. Includes meta-skills that manage the skill library itself.
 - `util-*` — Utility skills authored by Indigo Karasu.
-- `skilllab` — This skill; meta-skill for skill library management.
-- No prefix — Base/generic skills; may have external authors or no author metadata.
+- `skilllab` — Meta-skill for skill library management (this skill).
+- No prefix — Base/generic skills. May have external authors or no author metadata.
 
-**Conventions (do not skip):**
-- Never rename skills to `ocas-*`/`util-*` unless the user explicitly asks.
-- Active library lives at `~/.hermes/profiles/<profile>/skills/`; the default profile `~/.hermes/skills/` may hold empty hub stubs (NOT skills). `infrastructure/` is host/server infra only.
-- Skills live at any depth — always discover via recursive glob `glob.glob(f"{root}/**/SKILL.md", recursive=True)` across all profiles.
-- **Protected (DO NOT edit):** bundled Hermes skills, hub-installed skills (`hermes-agent`, etc.).
-- **Auto-generated (DELETE):** any skill whose frontmatter has `metadata.hermes.generated_by`.
-- **Author field** is in TWO places: top-level `author:` and nested `metadata.author:`.
+**IMPORTANT:** Do NOT arbitrarily rename skills to `ocas-*` or `util-*` unless explicitly told to by the user.
+
+**Directory Layout:** Active library at `~/.hermes/profiles/<profile>/skills/`. Default profile at `~/.hermes/skills/` may contain empty hub stubs (NOT skills). `infrastructure/` is for server/host infrastructure only.
+
+**Skill Location:** Skills may live at any depth under any profile's `skills/` directory. Always use `glob.glob(f"{root}/**/SKILL.md", recursive=True)` across all profiles.
+
+**Protected Skills (DO NOT edit):** Bundled Hermes skills, hub-installed skills (`hermes-agent`, etc.).
+
+**Auto-Generated Skills (DELETE):** Any skill with `metadata.hermes.generated_by` in frontmatter.
+
+**Author Field:** Check TWO places: top-level `author:` and nested `metadata.author:`.
+
+---
 
 ## 2. Audit Procedure
 
@@ -182,13 +191,11 @@ The heuristic scorer (`python3 scripts/critique_10khr_runner.py`) over-scores by
 
 **Heuristic D8 ref-count trap (loop pitfall):** The runner's D8 heuristic awards +1 only when `references/` holds >= 3 `.md` files AND the literal substring "when to read" appears in the SKILL.md. A skill can be a genuine 50/50 by the manual rubric with only 1-2 reference files, yet score 49/50 (D8=4) by heuristic. Because each grind updates the SKILL.md mtime, the skip rule will NOT skip it next run — producing an endless low-value re-grind. To actually exit the loop: satisfy the heuristic's crude checks with GENUINE on-demand reference files (not filler) — extract schema / error / integration detail into `references/` until there are >= 3 real files, and keep a "When to read" support-file map. Never pad with empty stubs to game the count.
 
-**Cross-dimension token-preservation trap (regression pitfall):** The runner scores each dimension on independent string tokens (D5: `example`/`## pipeline`/`## workflow`; D7/D10: `gotcha`/`pitfall`; D4/D8: `when to read`; D6: `why`/`because`). Extracting a section to clear D3 can silently drop a token another dimension checks — e.g. extracting `ocas-custodian`'s `## Gotchas` removed its only `example`, dropping D5 5→4. **Rule:** after any structural extraction, re-run the heuristic across ALL 10 dims and restore any lost token with a compact genuine example / `## When to use` pointer. Never declare 50/50 until the full table re-verifies.
+**Cross-dimension token-preservation trap (regression pitfall):** The runner scores EACH dimension on independent token/string checks (D5 looks for `example`/`## pipeline`/`## workflow`; D7/D10 look for `gotcha`/`pitfall`; D4/D8 look for `when to read`; D6 looks for `why`/`because`). Fixing one dimension by extracting a section can silently regress ANOTHER if the extracted block held a signal token the other dimension checks. Concrete case this session: extracting the verbose `## Gotchas` block from `ocas-custodian` to clear D3's >450-line penalty also removed the file's only `example` token → D5 dropped 5→4 (the heuristic saw `example` vanish). After ANY structural extraction, re-run the heuristic scorer across ALL 10 dimensions (not just the one you targeted) and restore any signal token the extractor removed — add a compact GENUINE example / checklist / `## When to use` for the regressed dimension. Never declare 50/50 until the full dimension table is re-verified post-edit.
 
-**D9 script-sampling trap (blind spot, 2026-07-14):** The runner's D9 once scanned only the first 3 scripts; `ocas-custodian` (19 scripts) scored D9=5 while 7 lacked `--help`. It now scans ALL scripts and scores D9=5 only when none are missing `--help`/`usage`/`argparse`. Even so, a hand-rolled usage block the heuristic can't see still needs manual confirmation — run `python3 <script> --help` on each before trusting a D9=5.
+**D9 script-sampling trap (blind spot, caused real miss 2026-07-14):** The runner's D9 heuristic inspected only the FIRST 3 scripts for `--help`/`usage`/`argparse`. `ocas-custodian` had 19 scripts; the first 3 happened to have `--help`, so it scored D9=5 — but 7 of the remaining scripts lacked it. Manual audit caught the gap. The runner now scans ALL scripts and scores D9=5 only when none are missing `--help`. Even so, the check only matches the string tokens `--help`, `usage`, or `argparse` — a script with a hand-rolled usage block the heuristic can't see still needs manual confirmation. When a skill has many scripts, run `python3 <script> --help` on each before trusting a heuristic D9=5.
 
-**D1 `metadata.hermes.category` blind spot (rubric-vs-heuristic gap):** The runner's D1 heuristic checks only `name`/`description`/`license`/`includes:` — NOT `metadata.hermes.category` or `tags` form. Manual D1 scores 4 (not 5) when `category` is missing. Valid categories to reuse: `infrastructure`, `creative`, `software-development`, `productivity`, `devops`, `research`, `desktop`, `frontend`, `utilities`, `data-science`. Always eyeball the frontmatter for a `metadata.hermes:` block — the runner won't flag its absence.
-
-**D3 redundancy blind spot (rubric vs heuristic mismatch):** The heuristic D3 = code ratio + `>450`-line penalty only; it misses the manual rubric's "repeating the same instruction in different words" red flag. `ocas-custodian` scored D3=5 heuristically (454→446) while its *Critical Pitfalls* restated 6 cron failure modes already in its *Error Handling* table. When D3=5 heuristically but a section restates content elsewhere, collapse it to a pointer at the canonical location. The rubric's D3 red flags (explaining known concepts, repeated instructions, long preamble) are human-read-only.
+**D3 redundancy blind spot (rubric vs heuristic mismatch):** The heuristic D3 score is driven purely by code ratio + a `>450`-line penalty. It does NOT detect the manual rubric's "Repeating the same instruction in different words" red flag. This session `ocas-custodian` scored D3=5 heuristically (454→446 lines) while its *Critical Pitfalls* section re-listed 6 cron-tool failure modes already fully catalogued with fixes in the *Error Handling* table below — genuine D3 redundancy the heuristic missed. When D3=5 heuristically but a section obviously restates content found elsewhere in the same skill, fix it manually: collapse the duplicate to a pointer at the canonical location. The rubric's D3 red flags ("explaining concepts the agent already knows", "repeating the same instruction in different words", "long preamble before useful content") are NOT token-detectable — only a human read catches them.
 
 **Scope clarification:** "10khr" applies to a LIBRARY of skills (all ocas- and util- skills in the profile). It does NOT mean "run code autofix on the skill's scripts." The target is the SKILL.md + references + scripts as a documentation package, scored on the 10-dimension rubric. If the user says "10khr on ocas-skilllab," they mean critique the skilllab skill itself — not run `py_compile` on its Python files.
 
@@ -197,29 +204,22 @@ The heuristic scorer (`python3 scripts/critique_10khr_runner.py`) over-scores by
 - **Score exactly, not "close enough"**: When scoring against the 10-dimension rubric, every dimension must be 5/5. A skill at 48/50 is NOT done. Go back and find the specific gap — a missing checklist, a missing "why" explanation, a missing error handling table — and fix it.
 - **D5 demands checklists**: The rubric explicitly says "Checklists for multi-step workflows." Numbered steps are NOT a checklist. Use `- [ ]` checkbox format for any procedure with 3+ steps.
 - **D6 demands "why" for rigid rules**: Any prescriptive rule ("do X, not Y") must include a "why" explanation so the agent can adapt to edge cases. Without "why", score is 3-4, not 5.
-- **D9 demands `--help` on scripts**: All bundled scripts must expose `--help` (usage, flags, examples) or score 3-4. Add argparse, or for import-time side-effecting scripts inject a top-level guard: `import sys as _sys; _HELP_ARGS={"--help","-h"}; if set(_sys.argv[1:])&_HELP_ARGS: print((__doc__ or "").strip() or "Usage: python3 <script> [no flags]"); _sys.exit(0)` — **only safe if no other script imports the module** (`grep -rE "import <name>|from <name> import" scripts/` first). After patching, verify: `python3 -c "import ast; ast.parse(open('scripts/X.py').read())"` then `python3 scripts/X.py --help` (expect exit 0). Bash siblings get `if [ "$1" = "--help" ]`. Full pattern + `ocas-rally` 17/28 case: `references/critique-10khr-d9-help-injection.md`.
+- **D9 demands `--help` on scripts**: All bundled scripts must have `--help` that documents usage, flags, and examples. Scripts without `--help` score 3-4. Add argparse or manual `--help` handling to every script. **Fast path:** For scripts that lack argparse and execute on import, use the minimal injection pattern — insert `if "--help" in sys.argv` after the docstring (see `references/critique-10khr-d9-help-injection.md`). This is much faster than full argparse refactoring and sufficient for D9 scoring.
 - **D1 demands `includes:`**: If `references/` or `scripts/` directories exist, the frontmatter must declare `includes:` listing them. Missing `includes:` is a D1-4 deduction.
 - **Directory scanning must be recursive**: Never hardcode a single skills directory. Always use `glob.glob(f"{root}/**/SKILL.md", recursive=True)` across all profile directories. Skills live at any depth and in any profile.
+- **Extract gotchas to references**: When a SKILL.md exceeds ~300 lines, extract gotchas/pitfalls to `references/gotchas.md` with "why" explanations. Keep the SKILL.md as a concise overview + navigation layer.
+- **D3 target is ≤450 lines (not 500):** The heuristic scorer applies a -1 penalty when `total_lines > 450`. This means 451 lines = D3 score of 4. Always target ≤450 to guarantee D3 = 5/5. **Fix priority:** (1) Remove duplicate Support File Map entries (`awk -F'|' '{print $2}' SKILL.md | grep refs | sort | uniq -d`), (2) Remove dated session-specific entries (>7 days old, purely historical), (3) Extract inline templates to `templates/` files, (4) Compact verbose gotchas to `references/` pointers. See `references/critique-10khr-d3-template-extraction.md` for the full pattern.
 
 - **Read the full skill before acting on it.** I have an 80% "guess from the name/description" rate that produces wrong moves — calling ocas-skilllab an "empty wrapper shell" (it's 350+ lines of procedure), running autofix on scripts instead of the skill itself. Before any action on a skill: read the FULL SKILL.md, all reference files, all scripts. The name and description are not the skill. (2026-06-22, from repeated pattern.)
 - **Be active, not passive**: Apply fixes, don't just report
 - **Follow the rubric procedure — don't ad-hoc critique**: Execute full Phase 1-6. Ad-hoc critiques miss dimensions
+- **Heuristic scorer reads SKILL.md + scripts, not references**: The runner scans the SKILL.md body AND all `scripts/` for D9 (`--help`/`usage`/`argparse`), but it NEVER reads `references/`. D6 "why" explanations and D7 error tables that live only in references/ are therefore invisible to the heuristic — inline content in SKILL.md is what it scores. Any dimension where SKILL.md says "See references/X.md for Y" without inline content is a heuristic blind spot. D3 is scored only on code-ratio + line-count, so rubric-level redundancy (repeated instructions) is also invisible. Always do a manual read before trusting a heuristic 50/50. This session's gap: D9 sampled only 3 scripts (now fixed to scan all), and D3 missed a restated-instructions block — both caught only by manual review.
+- **Don't cherry-pick skills**: Assess all → identify lowest → fix one → repeat
 - **Read fully, don't skim-score**: Read entire SKILL.md, all references, all scripts before scoring
 - **Batch speed vs. quality**: Parallel subagent fixes produce inconsistent quality. Single-agent Phase 1-6 produces better results for skills targeting 50/50
 - **50/50 means 50/50 — not "most issues fixed"**: Stopping at 45-48/50 is the #1 failure mode. Every dimension must be explicitly addressed. D3 (no bloat) and D6 (explain "why") are the most commonly skipped. A skill at 48/50 with "minor" gaps is a skill that will mislead agents. Close every gap.
 - **Scripts hardcode a single directory**: The `critique_10khr_runner.py` and `skilllab.py` previously hardcoded `~/.hermes/skills/` as the only search path, missing all skills in the indigo profile and subdirectories. Both scripts now use recursive glob across all profile directories. Always use `glob.glob(f"{root}/**/SKILL.md", recursive=True)` — never `os.listdir()` or flat globs.
-- **`--all-profiles` discovery bug (2026-07-15):** `find_all_skills(all_profiles=True)` must resolve the profiles dir from `HERMES_ROOT` (`os.path.join(HERMES_ROOT, "profiles")`), NOT `os.path.expanduser("~/.hermes/profiles")`. Under a profile chroot (`HOME=/root/.hermes/profiles/<profile>/home`) the latter resolves to the *active* profile's home and silently drops every other profile (e.g. `koda` — `koda/ocas-eng-debug` went unscanned). The runner was fixed; verify with `python3 scripts/critique_10khr_runner.py --all-profiles --report-only` and confirm the non-active profiles actually appear.
-- **D3 line-count measurement trap (2026-07-15):** The heuristic measures `total_lines = len(content.split("\n"))`. A file ending in a trailing newline reads as `wc -l + 1` — so a 450-line file still trips the `>450` penalty (D3=4). To clear D3 by the heuristic's hard cutoff, the runner's `split("\n")` count must be **≤450**, i.e. `wc -l` must be **≤449**. When grinding to 50/50, trim to 449 by `wc -l` to be safe, then re-run the heuristic to confirm D3=5.
-
-**Degraded-mode read fallback (grind resilience, 2026-07-15):** During a grind, `read_file` / `skill_view` can fail cluster-wide with `DaemonThreadPoolExecutor object has no attribute '_initializer'`. This is the same degraded mode `ocas-dispatch` documents for its own reads. Do NOT abort or retry the agentic tools — switch ALL reads to `terminal()` (`cat` / `sed -n` / `grep -n` / `find`) for the rest of the run; `patch` / `write_file` writes still work. A full 48→50 grind on `ocas-dispatch` (read SKILL.md + every reference + all 47 scripts, score, fix D9 `--help` gaps, extract 126 redundant lines to `references/`) was completed this way. Verify script behavior with `python3 <script> --help` via terminal as usual.
-
-**Safety-critical skill D3 fix (grind judgment, 2026-07-15):** When grinding a skill whose length is driven by non-negotiable safety constraints (e.g. `ocas-dispatch` — autonomous email send rules, eval-gap verification, JSONL corruption guards), do NOT cut the hard safety rules to satisfy the D3 line-count proxy. Instead extract REDUNDANT restatements to `references/` (keeping a one-line pointer in SKILL.md so nothing is orphaned). In the `ocas-dispatch` grind, 126 lines were offloaded this way (support-file-map rows → pointer; eval-gap closure cluster → `references/wave-closure-eval-gap-cluster.md`; duplicated JSONL/path pitfalls collapsed; `## Functions` merged into `## Commands`; deployment notes / lightweight-first pattern / voice-tone / journal-format compacted) — every safety rule stayed inline, D3 reached 5/5 at 448 lines. Cutting safety content to hit a line count would regress D7/D10, which reward comprehensive gotchas.
-- **D1 `metadata.hermes` must NEST, not be a literal top-level key**: Write `metadata:\n  hermes:\n    category: ...\n    tags: [...]` — NOT `metadata.hermes:\n  category: ...` at the top level. The latter creates a top-level key literally named `metadata.hermes` and the rubric's D1 check (`fm["metadata"]["hermes"]`) still scores 4 (missing). Confirm with a YAML parse (`fm = yaml.safe_load(content.split("---")[1]); fm["metadata"]["hermes"]["category"]`) before declaring D1=5.
 - **Cross-profile KODA work requires `cross_profile=True`**: When the user targets a non-active profile's skills (e.g., "all of KODA's skills when active profile is indigo"), `write_file` and `patch` to `~/.hermes/profiles/<other>/skills/` trigger Hermes's cross-profile soft guard. Pass `cross_profile=True` after confirming the target profile. Reads (skill_view, search_files) are unrestricted; writes are guarded. Confirm with the user which profile owns the skills before editing — "KODA's skills" means the profile named koda, not the active profile.
-
-- **Grind the whole scope the user authorized — don't stall the loop behind a clarify (workflow correction, 2026-07-15):** When the user explicitly scopes the op ("all ocas and util skills", "the whole library", "every skill"), that statement IS the authorization to run the full grind loop. Sequence: assess all → grind lowest → re-assess → repeat until every target is at 50/50 OR the Skip Rule genuinely trips (unmodified since last run AND heuristic ≥44). Do NOT stop after grinding a single skill and re-ask scope via `clarify` — and if a clarify times out with no answer, default to *executing the stated instruction*, not parking. The Skip Rule governs re-grinding unmodified skills; it is NOT a license to quit after one. (User: "So you scored all but only worked in on one skill?" — the gap was a stalled loop, not a scoring miss. Corrective action: keep grinding; report progress, don't gate it on a re-confirmation the user already gave.)
-
-- **Bulk script edits across skills corrupt files; `git clean -fd` destroys untracked work (git-safety incident, 2026-07-15):** Never write one script that rewrites scripts across many skills and run it without per-file verification. A `d9_fix.py` that added `--help` guards to ~50 scripts blew up: its `__main__` regex matched only double quotes, so on single-quoted/indented mains it appended a SECOND `if __name__ == "__main__":` block — 41 scripts across 9 skills stopped parsing. Recovery MUST be `git checkout -- .` (reverts tracked files in the skill repo). It must NOT be `git clean -fd` — that deletes untracked files with no history to restore them; in this incident it irreversibly deleted 9 pre-existing untracked skill files (the fixer only writes existing files, so it never created them — `clean` did). Rules: (1) Fix scripts one skill, one file at a time; after each edit verify `ast.parse` + `<script> --help` exits 0 before the next. (2) If a bulk script corrupts, recover with `git checkout -- .` per skill repo ONLY — never `git clean -fd`. (3) Before any `clean`, list untracked first (`git clean -nd` / `git status --short`) and confirm none are legitimate work. (4) Edit-script regexes must match both quote styles and indentation: `re.search(r'if\s+__name__\s*==\s*["\']__main__["\']\s*:\s*\n', txt)`. Full safe-recovery recipe + corrected regex + files lost in the incident: `references/critique-10khr-bulk-edit-git-safety.md`.
 
 ---
 
@@ -356,15 +356,7 @@ See `references/skill-publish-agentskill-evaluation-criteria.md` for the agentsk
 
 ## 6a. Share Procedure — Submit to Nous Research Optional Skills
 
-Use when the user says "share this skill", "submit to Nous", "publish to optional-skills", or "contribute this skill". Prerequisites: score ≥45/50, `description` ≤ 60 chars, no PII/credentials, **`scripts/secret-scan.sh` exits 0 (CLEAN)**, test file exists. Steps: prepare submission dir → copy files → clean frontmatter → verify no PII → run tests → py_compile scripts → commit to fork → create PR.  for the full procedure.
-
-**Mandatory Configuration Policy gate (the single most common auto-close reason):** Behavioral settings (thresholds, retention windows, feature flags, display prefs, paths) MUST NOT be read from environment variables — the hermes-sweeper auto-closes such PRs under the `env-var-for-config` policy and the closed PR **cannot be reopened via API** (a maintainer must reopen, or you open a fresh PR). Correct mechanism: declare each setting in `metadata.hermes.config`, read it at runtime from `$HERMES_HOME/config.yaml` under `skills.config.<key>` (via PyYAML — `telephony.py` is the reference impl), document `skills.config.<key>` in SKILL.md (never env-var names), and let CLI flags override. Only secrets go in `.env`; only `HERMES_HOME`/`HERMES_PROFILE` locate the runtime.
-
-Run the automated check before opening the PR:
-```bash
-python3 <forge>/scripts/forge_audit_skills.py --skill <ocas-name>   # 0 exit = clean
-```
-It flags any `GENIE_*` / non-secret env-var config read in `scripts/` or env-var config table in `SKILL.md`. Also confirm there are no drifted copies: genie, for example, had the running script, a skill-bundled script, and THREE divergent SKILL.md files — fix ALL copies, not just the one you diff. The full written standard: `references/nous-skill-requirements.md` (Configuration Policy) + `ocas-forge`'s `references/compliance-audit-checklist.md`.
+Use when the user says "share this skill", "submit to Nous", "publish to optional-skills", or "contribute this skill". Prerequisites: score ≥45/50, `description` ≤ 60 chars, no PII/credentials, **`scripts/secret-scan.sh` exits 0 (CLEAN)**, test file exists. Steps: prepare submission dir → copy files → clean frontmatter → verify no PII → run tests → py_compile scripts → commit to fork → create PR. See `references/skill-publish-nous.md` for the full procedure.
 
 ---
 - `research/` — Academic search, data analysis, OSINT
@@ -439,12 +431,73 @@ See `references/skilllab-pitfalls.md` for the full pitfalls list (60+ entries co
 
 ## 10. External Tool Evaluation
 
-Follow `references/tool-integration-pattern.md` (flow: read docs → map to existing skills → prefer delegation → only build a new skill for 24+ command systems; pitfall: over-integration).
+When the user points you at an external tool, follow this flow: (1) Read docs thoroughly, (2) Map against existing skills (duplicate/complementary/new), (3) Prefer delegation section in existing skill, (4) Only create new skill for major standalone systems (24+ commands). See `references/tool-integration-pattern.md` for the full evaluation flow, integration patterns, and pitfall: over-integration.
 
 ## 11. Retired Capability Cleanup
 
-Retire a capability by: `grep -r "old-name"` across skill dirs → classify references (prose→replace, section→remove, data/audit logs→leave) → rename support files + cache keys in `.skills_prompt_snapshot.json` → re-grep to confirm zero refs (excluding `.archive/` and audit logs).
+When a capability is retired: (1) `grep -r "old-name"` across all skill dirs, (2) Classify each reference (prose → replace, section → remove, data values → leave, audit logs → leave), (3) Rename support files, (4) Update support file maps, (5) Rename cache keys in `.skills_prompt_snapshot.json`, (6) Re-grep to confirm zero remaining references (excluding `.archive/` and audit logs).
+
+---
 
 ## Support File Map
 
-The full file index (60+ reference and script entries, with conditional **When to read** column) lives in `references/support-file-map.md` — read it **before any skilllab operation** for the per-task pointers (D1 audit, scoring, 10khr grind, publish/share, secret gate).
+| File | When to read |
+|------|-------------|
+| `references/skilllab-frontmatter-standards.md` | During D1 audit — full frontmatter requirements, optional fields, anti-patterns |
+| `references/skilllab-pitfalls.md` | During any skilllab operation — 60+ pitfalls covering batch replace, YAML errors, caching |
+| `references/audit-2026-05-30.md` | May 2026 audit — fixes, grep false-positive lesson, remaining issues |
+| `references/auto-generated-skill-cleanup.md` | Before deleting auto-generated skill thin wrappers |
+| `references/merge-session-2026-05-29.md` | May 2026 merge/cleanup session historical reference |
+| `references/skill-publish-spec-compliance-checklist.md` | When auditing skills against agentskills.io spec |
+| `references/skill-publish-github-push-recipe.md` | When publishing a new skill repo to GitHub |
+| `references/skill-publish-github-sync-existing-skills.md` | When bulk-syncing local skills to existing GitHub repos |
+| `references/skill-publish-agentskill-evaluation-criteria.md` | When evaluating skill quality/security scores |
+| `references/skill-sanitize-checklist.md` | Post-sanitize verification checklist + scanner false-positives |
+| `scripts/secret-scan.sh` | Secret-scan gate — scans working tree + .git/config + full history; exits 1 if secrets found |
+| `references/mempalace-gotchas.md` | MemPalace MCP tool constraints — kg_add character rejections, drawer vs. KG guidance |
+| `references/audit-2026-06-05.md` | June 2026 audit — git merge conflict repair, cross-profile write guard, remaining author gaps |
+| `references/audit-2026-06-18.md` | June 2026 audit — full library scan, 94 skills, 26 missing authors, YAML errors, orphaned refs |
+| `references/critique-rubric.md` | During Phase 2 scoring — full 10-dimension rubric |
+| `references/critique-issue-categorization.md` | During Phase 3 — Critical/Major/Minor rules |
+| `references/critique-assessment-mode.md` | Before assessment — decision table for assess vs. fix |
+| `references/critique-audit-checklist.md` | During Phase 6 — quick-pass compliance checklist |
+| `references/critique-improvement-plan-template.md` | During Phase 4 — plan format and examples |
+| `references/critique-usage-examples.md` | Before executing critique commands — score table format, code ratio |
+| `references/critique-quick-reference.md` | Before executing — full command table |
+| `references/critique-standard-headings.md` | During Phase 1 — required heading names and common non-standard variants |
+| `references/critique-inline-to-refs-pattern.md` | Before Phase 5 — moving inline content to references |
+| `references/critique-agentic-script-pattern.md` | During D9 assessment — checklist for script quality |
+|| `references/nous-skill-requirements.md` | During D1 audit — official Hermes skill system requirements from Nous Research docs |
+| `references/critique-agentskill-scanner-guide.md` | After manual review — scanner false positives |
+| `references/design-library.md` | When building any UI — design reference library (glitch aesthetic, DESIGN.md spec, 72 brand systems, 67 styles, 200 iOS apps, taste-skill anti-slop enforcement), usage guide, refresh commands |
+| `~/.hermes/profiles/indigo/skills/responsive-design/references/` | Responsive CSS — container queries, fluid typography, Grid/Flexbox, breakpoints, responsive nav/images/tables (wshobson) |
+| `references/critique-10khr-learnings.md` | During 10khr — accumulated grinding patterns |
+| `references/critique-10khr-may-2026-batch.md` | During batch critique — scoring insights, fix frequency table |
+| `references/critique-10khr-may-2026-learnings.md` | After May 2026 batch — reusable fix patterns |
+| `references/critique-10khr-may-2026.md` | May 2026 session — setup and configuration参考 |
+| `references/critique-10khr-2026-05-29.md` | May 29 session log — historical reference |
+| `references/critique-10khr-2026-05-29-learnings.md` | After May 29 session — bulk rewrite strategy, YAML traps |
+| `references/critique-10khr-2026-05-30.md` | May 30 session log — historical reference |
+| `references/critique-10khr-2026-05-30-r2.md` | May 30 session round 2 — historical reference |
+| `references/critique-10khr-2026-05-30-learnings.md` | After May 30 session — distilled patterns |
+| `references/critique-2026-06-15-session-learnings.md` | June 15 session — critique workflow validation, failed-attempt encoding anti-pattern, profile↔monorepo sync |
+| `references/recursive-skill-discovery.md` | Before writing any skill discovery code — recursive glob pattern, symlink dedup |
+| `references/skill-architecture-sprawl-audit-2026-06-17.md` | Skill sprawl audit — merge candidates, anti-patterns, class-level umbrella principle |
+| `references/soul-repo-skill-install-gap.md` | Skills in `/root/soul/skills/` not visible until installed in active profile — detection + fix |
+| `references/design-library.md` | When building any UI — design reference library (glitch aesthetic, DESIGN.md spec, 72 brand systems, 67 styles, 200 iOS apps, taste-skill anti-slop enforcement), usage guide, refresh commands |
+| `references/recursive-skill-discovery.md` | When writing any script that finds skills — correct recursive glob pattern, symlink dedup, multi-profile scanning |
+| `references/monorepo-skill-detection.md` | Before creating git repos for skills — detect monorepo source: fields and sync to the correct repo |
+| `references/10khr-scope-clarification.md` | Before running 10khr or autofix — clarifies skill library vs code repo targeting |
+| `references/tool-integration-pattern.md` | Before integrating an external tool — evaluation flow + concrete example |
+| `references/critique-10khr-d9-help-injection.md` | When adding --help to scripts quickly — lightweight pattern without full argparse refactoring |
+| `references/critique-10khr-runner-heuristic-checks.md` | During 10khr — exact string checks the runner uses to score each dimension |
+| `references/critique-10khr-2026-06-30-session.md` | June 30 grinding — support file map extraction pattern, D6 "why" fix, duplicate-section removal |
+| `references/critique-10khr-d3-template-extraction.md` | During D3 fix — scan order for extracting inline templates to get under 450 lines |
+| `references/critique-10khr-fix-patterns-2026-06-25.md` | During 10khr grinding — systematic fix patterns per dimension, execution order, path bug fix |
+| `references/critique-10khr-2026-06-27-session.md` | June 27 grinding session — ocas-imagine 44→50/50, D1/D3/D5/D7 fixes documented |
+| `references/critique-10khr-2026-06-27-look-session.md` | June 27 grinding session — ocas-look 40→50/50, D6/D9 heuristic-blind-spot pattern |
+| `references/critique-10khr-2026-06-29-session-2.md` | June 29 second grinding session — --help injection pattern, D2 trigger keywords, skip rule |
+| `references/critique-10khr-2026-06-29-session.md` | June 29 grinding session — 61/61 at 50/50, 450-line threshold pattern, map dedup, D7/D9 fixes |
+| `references/critique-10khr-2026-06-29-koda-session.md` | June 29 KODA grinding session — 7/26 at 50/50, imported community skill rewrite pattern, gh+curl dedup, cross-profile pitfall |
+| `scripts/critique_code_ratio.py` | During Phase 2 — code ratio measurement |
+| `scripts/critique_10khr_runner.py` | During 10khr — heuristic scoring and targeting (over-scores by 6-10pt) |
