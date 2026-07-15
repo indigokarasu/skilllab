@@ -55,6 +55,9 @@ def measure_code_ratio(path: str) -> dict:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
+        print(__doc__)
+        sys.exit(0)
     if len(sys.argv) < 2:
         print("Usage: python3 critique_code_ratio.py <path-to-SKILL.md>", file=sys.stderr)
         sys.exit(1)
