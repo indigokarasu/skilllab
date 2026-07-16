@@ -167,12 +167,12 @@ The `critique_10khr_runner.py` now scans recursively across all profile director
 It finds both `ocas-*` and `util-*` skills at any depth, resolves symlinks to avoid duplicates,
 and deduplicates by skill name. Use `--report-only` to assess without outputting a grinding target.
 
-1. Run Bulk D1 Check (missing includes:, invalid license) as pre-pass
-2. Read every SKILL.md fully (across ALL profiles and subdirectories)
-3. Score all 10 dimensions for each skill
-4. Rank all skills by score
-5. Fix the single lowest-scoring skill — **to 50/50, not "most issues fixed"**
-6. Re-assess and repeat
+- [ ] Run Bulk D1 Check (missing includes:, invalid license) as pre-pass
+- [ ] Read every SKILL.md fully (across ALL profiles and subdirectories)
+- [ ] Score all 10 dimensions for each skill
+- [ ] Rank all skills by score
+- [ ] Fix the single lowest-scoring skill — **to 50/50, not "most issues fixed"**
+- [ ] Re-assess and repeat
 
 The heuristic scorer (`python3 scripts/critique_10khr_runner.py`) over-scores by 6-10 points. Use for candidate ranking only. Always do manual assessment before fixing.
 
@@ -245,12 +245,12 @@ Identify groups sharing a first word or domain keyword. For each cluster with 2+
 **c. Demote to support files** — Move narrow content to `references/`, `templates/`, or `scripts/` under the umbrella.
 
 ### Merge Steps (when absorbing skill B into skill A)
-1. Copy B's scripts/references into A's `scripts/` and `references/` directories
-2. Append B's SKILL.md content as a new Part/section in A's SKILL.md
-3. Add `metadata.merged-from: <B-name>` to A's frontmatter
-4. Add B's triggers to A's `triggers:` list
-5. Archive B's entire directory to `~/.hermes/profiles/indigo/skills/.archive/<B-name>/`
-6. Update all references (cron jobs, SOUL.md, memory, other skills, cron prompts)
+- [ ] Copy B's scripts/references into A's `scripts/` and `references/` directories
+- [ ] Append B's SKILL.md content as a new Part/section in A's SKILL.md
+- [ ] Add `metadata.merged-from: <B-name>` to A's frontmatter
+- [ ] Add B's triggers to A's `triggers:` list
+- [ ] Archive B's entire directory to `~/.hermes/profiles/indigo/skills/.archive/<B-name>/`
+- [ ] Update all references (cron jobs, SOUL.md, memory, other skills, cron prompts)
 
 ### Package Integrity
 Before archiving, inspect the source as a **complete directory package** (may include `references/`, `templates/`, `scripts/`, `assets/`). If it has support files or relative links:
@@ -350,55 +350,23 @@ See `references/skill-publish-agentskill-evaluation-criteria.md` for the agentsk
 
 ### GitHub Mechanics
 - Full push recipe: `references/skill-publish-github-push-recipe.md`
-- Bulk sync workflow for existing repos: `references/skill-publish-github-sync-existing-skills.md`. Automated daily sync also runs via `/root/.hermes/profiles/indigo/scripts/skill-sync-push.sh` (cron `ocas-skilllab-sync`, 04:00) — it commits+pushes all remoted skills with changes, secret-gates each repo, and sets the Indigo Karasu identity (the host global git config defaults to `Koda`, a different profile; on manual commits set `git -C <skill> config user.name "Indigo Karasu"` / `user.email "mx.indigo.karasu@gmail.com"` too). After any local skill edit, this keeps GitHub current without manual pushes.
+- Bulk sync workflow for existing repos: `references/skill-publish-github-sync-existing-skills.md`. Automated daily sync runs via the UNIFIED `/root/.hermes/profiles/indigo/scripts/skill-sync-all.sh` (cron `skill-sync-all`, 04:00 — SUPERSEDES the now-PAUSED `ocas-skilllab-sync` + `monorepo-skill-sync` crons) — it discovers every `ocas-*`/`util-*`/`eng-*` SKILL.md across both `indigo` and `koda` profiles at any depth, secret-gates, and sets the Indigo Karasu identity (the host global git config defaults to `Koda`, a different profile; on manual commits set `git -C <skill> config user.name "Indigo Karasu"` / `user.email "mx.indigo.karasu@gmail.com"` too). After any local skill edit, this keeps GitHub current without manual pushes.
 - **Creating a NEW private monorepo from existing skills (2026-07-15):** When the user says "make a new private monorepo with all <X> skills," COPY the skill dirs into a fresh staging dir (do NOT `mv` — leave originals in place so the agents that load them keep working). Then: (1) strip any nested `.git` inside copied trees (`rm -rf <copy>/<skill>/references/livearch/.git`) or git stores an empty **gitlink** and the real files are NOT committed — re-add and confirm with `git ls-files | grep -c livearch` > 0; (2) `git init`, set Indigo identity; (3) run `secret-scan.sh` and remediate placeholders (see masked-output pitfall above); (4) `gh repo create indigokarasu/<name> --private`; (5) `git remote add origin git@github.com:indigokarasu/<name>.git` explicitly and `git push -u origin main` — `gh repo create` does NOT auto-wire `origin` in this shell, and a bare `git push` then fails with "Could not read from remote repository." (6) Verify remote SKILL.md count == local.
 - **Do NOT ask which account to use when only one GitHub account is authenticated.** When `gh` is logged in to a single account (check: `gh auth status`), create the repo under that account. Asking "which account?" when only `indigokarasu` is available is a wasted round-trip — the user's correction: "You only have your github account, indigokarasu, so what are you asking for?" Pick the authenticated account and proceed; only ask if the user explicitly names a different one.
 - **Monorepo is the sync PUSH TARGET — never create per-skill repos for skills already under a monorepo (2026-07-15).** All `util-*` skills live in the single `indigokarasu/utilities` monorepo (subdirs named WITHOUT the `util-` prefix: `buy`, `draw`, …); `eng-*` skills live in `indigokarasu/eng-skills`. Each live skill's `source:` frontmatter already points to its monorepo subdir. So when syncing, the workflow is: clone the monorepo → copy live skill dir → monorepo subdir → commit → push `main`. Do NOT `git init` a standalone repo per skill, do NOT `gh repo create` per skill — that creates orphan repos the `source:` field doesn't reference (the user's redirect: "Util- skills have a monorepo, if there are new skills add them to the monorepo"). Always read `source:` first (rule at top of §6) before any repo operation.
-- **Unified monorepo sync action (2026-07-15):** `bash /root/.hermes/profiles/indigo/scripts/monorepo-sync.sh` copies live `util-*` (from `indigo/skills`) and `eng-*` (from both `indigo` and `koda` profiles) into their monorepos, then pushes. It: strips nested `.git`/`.bak`/pycache from each copy; sanitizes doc-URL placeholders (`<POSTGRES_URL>` / `<GITHUB_URL_WITH_TOKEN>`) so the secret gate passes; gates on `secret-scan.sh --working-tree` (NOT full-history mode — committed doc prose in `util-github` would otherwise block the push); and pushes `main`. Cron `monorepo-skill-sync` runs it daily 05:00. Three-tier sync is now: ocas-* (per-skill repos → `skill-sync-push.sh` @ 04:00), util-* + eng-* (monorepos → `monorepo-sync.sh` @ 05:00). Both set Indigo identity (host global git defaults to `Koda`). Live skills are NOT themselves git repos; the monorepos are push targets only.
+- **Unified under ONE cron `skill-sync-all` (daily 04:00) → `/root/.hermes/profiles/indigo/scripts/skill-sync-all.sh`** (SUPERSEDES the two older crons `ocas-skilllab-sync` + `monorepo-skill-sync`, now PAUSED). It DISCOVERS every `ocas-*`/`util-*`/`eng-*` SKILL.md across BOTH `indigo` and `koda` profiles at ANY depth by rule (no hard-coded lists — see `references/skill-sync-discovery.md`), so a new skill is never missed. ocas-* → own repo `indigokarasu/<name>` (NEW repos strip the `ocas-` prefix per user directive; an existing prefixed remote is detected and reused, never duplicated); util-* → monorepo `indigokarasu/utilities` (subdir strips `util-`); eng-* → monorepo `indigokarasu/eng-skills` (subdir keeps `eng-`). All set Indigo identity; idempotent (no changes ⇒ no push). The discovery guard rejects a `SKILL.md` nested inside another skill's repo (prevents recursion/dupe).
+- **Reconciling a skill whose remote already exists (2026-07-15):** When `git init`-ing a local skill dir that already has a remote repo, FETCH FIRST and check for `origin/main` BEFORE committing. If the remote has history, `git checkout -B main origin/main` to stand local content on top — do NOT `git merge`/`git pull` blindly, and NEVER assume the remote is empty. A remote can itself be a **meta-repo** containing nested sibling skills: a `merge`/`checkout -B` of such a remote into the local dir pollutes it with the remote's nested siblings (e.g. merging `indigokarasu/ocas-10xeng` — a meta-repo — pulled its sibling skills as subdirs into the local `ocas-10xeng`, which then got re-pushed as pollution). If pollution occurs: `git rm -r --cached <nested-sibling-dirs>` + `rm -rf`, commit, `--force-with-lease` push (safe: only overwrites if remote unchanged since fetch). Prefer `git fetch` + inspect `git ls-tree -r --name-only origin/main` to learn the remote's real shape BEFORE touching the working tree.
 - **`secret-scan.sh --working-tree` mode (added 2026-07-15):** full-history scanning blocks legitimate pushes because pre-existing committed doc prose (example credential URLs in `util-github/credential-purge.md`, the scanner's own regex literal in `util-github/scripts/secret_scan.sh`) flags as "secret." For a SYNC gate you only care about NEW secrets in the working tree, so pass `--working-tree` (scans working tree + `.git/config`, skips `git rev-list --all`). The script excludes itself (`secret-scan.sh`/`secret_scan.sh`) from the working-tree grep. Use full mode only for pre-publish audits where history matters.
 
 ---
 
 ## 6a. Share Procedure — Submit to Nous Research Optional Skills
 
-Use when the user says "share this skill", "submit to Nous", "publish to optional-skills", or "contribute this skill". Prerequisites: score ≥45/50, `description` ≤ 60 chars, no PII/credentials, **`scripts/secret-scan.sh` exits 0 (CLEAN)**, test file exists. Steps: prepare submission dir → copy files → clean frontmatter → verify no PII → run tests → py_compile scripts → commit to fork → create PR.  for the full procedure.
+Use when the user says "share this skill", "submit to Nous", "publish to optional-skills", or "contribute this skill". Prerequisites: score ≥45/50, `description` ≤ 60 chars, no PII/credentials, **`scripts/secret-scan.sh` exits 0 (CLEAN)**, test file exists.
 
-**Mandatory Configuration Policy gate (the single most common auto-close reason):** Behavioral settings (thresholds, retention windows, feature flags, display prefs, paths) MUST NOT be read from environment variables — the hermes-sweeper auto-closes such PRs under the `env-var-for-config` policy and the closed PR **cannot be reopened via API** (a maintainer must reopen, or you open a fresh PR). Correct mechanism: declare each setting in `metadata.hermes.config`, read it at runtime from `$HERMES_HOME/config.yaml` under `skills.config.<key>` (via PyYAML — `telephony.py` is the reference impl), document `skills.config.<key>` in SKILL.md (never env-var names), and let CLI flags override. Only secrets go in `.env`; only `HERMES_HOME`/`HERMES_PROFILE` locate the runtime.
+Full procedure (config-policy gate, `forge_audit_skills.py` check, category table, gotchas, sanitize checklist) in `references/skilllab-share-procedure.md`. Key gate: behavioral settings MUST be declared in `metadata.hermes.config` + read from `$HERMES_HOME/config.yaml` (never env vars) or the PR is auto-closed and cannot be reopened via API.
 
-Run the automated check before opening the PR:
-```bash
-python3 <forge>/scripts/forge_audit_skills.py --skill <ocas-name>   # 0 exit = clean
-```
-It flags any `GENIE_*` / non-secret env-var config read in `scripts/` or env-var config table in `SKILL.md`. Also confirm there are no drifted copies: genie, for example, had the running script, a skill-bundled script, and THREE divergent SKILL.md files — fix ALL copies, not just the one you diff. The full written standard: `references/nous-skill-requirements.md` (Configuration Policy) + `ocas-forge`'s `references/compliance-audit-checklist.md`.
 
----
-- `research/` — Academic search, data analysis, OSINT
-- `communication/` — Email, messaging, social media
-- `security/` — Penetration testing, forensics, auditing
-- `mlops/` — ML training, fine-tuning, inference
-- `blockchain/` — Crypto, DeFi, NFTs
-- `finance/` — Trading, modeling, analysis
-- `gaming/` — Game servers, emulators
-- `health/` — Fitness, nutrition, medical
-- `payments/` — Payment processing, billing
-- `web-development/` — Frontend, backend, full-stack
-- `software-development/` — Code review, debugging, testing
-- `mcp/` — MCP server integrations
-- `dogfood/` — Agent self-improvement, testing
-- `migration/` — Data migration, onboarding
-- `autonomous-ai-agents/` — Subagent orchestration
-
-### Gotchas
-
-- **Description length is enforced:** The CONTRIBUTING.md has `assert len(description) <= 60`. A skill with a 100+ char description will be rejected. Be aggressive — cut articles, merge phrases, use short words.
-- **No external dependencies:** Skills should use stdlib + existing Hermes tools. If a skill requires pip packages, it belongs in Skills Hub, not optional-skills.
-- **Tests are required:** Every skill needs `tests/test_<skill>_skill.py` with at least import, help, dry-run, and frontmatter tests.
-- **Author is the agent:** Use the agent's own name/GitHub, not the user's. The user directs, the agent authors.
-- **No user data:** Never include the user's name, email, paths, or personal config in the submitted skill. All paths should be generic (`~/.hermes/`, `/root/`, etc.).
-
-See `references/skill-sanitize-checklist.md` for the full sanitize procedure.
-
----
 
 ## 7b. Secret Scan Gate
 
@@ -457,5 +425,5 @@ Retire a capability by: `grep -r "old-name"` across skill dirs → classify refe
 
 The full file index (60+ reference and script entries, with conditional **When to read** column) lives in `references/support-file-map.md` — read it **before any skilllab operation** for the per-task pointers (D1 audit, scoring, 10khr grind, publish/share, secret gate).
 
-- `scripts/skill-sync-push.sh` — reusable sync action: commits+pushes every remoted skill with changes or unpushed commits, secret-gated, sets Indigo identity. Drives cron `ocas-skilllab-sync` (daily 04:00). `DRY_RUN=1` for a no-op report.
-- `scripts/monorepo-sync.sh` — unified monorepo sync: copies live `util-*` + `eng-*` skills into the `utilities` / `eng-skills` monorepos (strips nested `.git`/`.bak`/pycache, sanitizes doc-URL placeholders, secret-gates `--working-tree`), pushes `main`. Drives cron `monorepo-skill-sync` (daily 05:00). `DRY_RUN=1` for a no-op report.
+- `scripts/skill-sync-all.sh` — UNIFIED sync action (SUPERSEDES `skill-sync-push.sh` + `monorepo-sync.sh`): discovers every `ocas-*`/`util-*`/`eng-*` SKILL.md across `indigo`+`koda` profiles by rule (no hard-coded lists), syncs ocas-* as per-skill repos (new names strip `ocas-`), util-*/eng-* into the `utilities`/`eng-skills` monorepos (strips nested `.git`/`.bak`/pycache, sanitizes doc-URL placeholders, secret-gates `--working-tree`), pushes. Drives cron `skill-sync-all` (daily 04:00). `DRY_RUN=1` for a no-op report. Reusable discovery helpers documented in `references/skill-sync-discovery.md`.
+- `scripts/secret-scan.sh` — secret gate (full + `--working-tree` modes). Excludes itself. See §7b.
