@@ -1,8 +1,13 @@
 # skilllab
 
-Skill library maintenance: audit, merge, rename, delete, consolidate, publish, sanitize, and critique.
+<p align="center">
+<img src="./assets/readme/hero.svg" width="100%" alt="skilllab: skill library maintenance — audit, merge, rename, delete, consolidate, publish, sanitize, and critique">
+</p>
 
-Manages the full lifecycle of skills in a Hermes Agent environment.
+skilllab — skilllab: skill library maintenance — audit, merge, rename, delete, consolidate, publish, sanitize, and critique
+
+
+> Tell it what you need. It does the work.
 
 ## What it does
 
@@ -10,7 +15,11 @@ Manages the full lifecycle of skills in a Hermes Agent environment.
 - **Critique** — score skills against the 10-dimension rubric, generate improvement plans, run iterative fix loops (merged from ocas-critique)
 - **Merge** — consolidate overlapping skills into class-level umbrellas
 - **Rename** — move a skill directory and update its name field
-- **Delete** — archive a skill to `.archive/`
+- **Delete** — archive a skill to .archive/
 - **Publish** — push a skill to GitHub for agentskills.io
 - **Sanitize** — extract inline credentials to reference files
 - **Hygiene** — check for grep false-positives and stale references
+
+---
+
+*skilllab is part of the [OCAS Agent Suite](https://github.com/indigokarasu).*
