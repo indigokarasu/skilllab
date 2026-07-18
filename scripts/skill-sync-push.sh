@@ -5,6 +5,14 @@
 # (the host global git config defaults to "Koda", a different profile).
 # Author: Indigo Karasu. Invoked by cron 'ocas-skilllab-sync' (daily 04:00).
 set -u
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  echo "Usage: skill-sync-push.sh [SKILLS_ROOT]"
+  echo "Commit + push every local skill repo under SKILLS_ROOT that has uncommitted changes"
+  echo "or is ahead of its upstream. Skips repos where the secret-scan gate fails."
+  echo "  DRY_RUN=1  -> no-op report (does not commit or push). Default: 0."
+  echo "  Default SKILLS_ROOT: /root/.hermes/profiles/indigo/skills"
+  exit 0
+fi
 SKILLS_ROOT="${1:-/root/.hermes/profiles/indigo/skills}"
 SECRET_SCAN="${SKILLS_ROOT}/ocas-skilllab/scripts/secret-scan.sh"
 IDENTITY_NAME="Indigo Karasu"
