@@ -7,10 +7,12 @@ set -u
 MODE="full"
 case "${1:-}" in
   --help|-h)
+    TARGET="."
     echo "Usage: secret-scan.sh [--working-tree] <dir>"
     echo "Scans <dir> for secrets. Default: working tree, .git/config, and full git history."
     echo "  --working-tree : scan working tree + .git/config only (skip history) — use to gate sync/publish of NEW changes."
-    echo "Exits 0 if CLEAN, 1 if a potential secret is found, 2 if no .git present." ;;
+    echo "Exits 0 if CLEAN, 1 if a potential secret is found, 2 if no .git present."
+    exit 0 ;;
   --working-tree) MODE="wt"; TARGET="${2:-.}";;
   *) MODE="full"; TARGET="${1:-.}";;
 esac
