@@ -5,10 +5,20 @@ Companion to `scripts/critique_10khr_runner.py` and `references/critique-rubric.
 
 ## Steps
 
-1. **Rank:** `python3 scripts/critique_10khr_runner.py --report-only` -> sorted table.
+1. **Rank:** Do NOT use `--report-only` if you need the skip rule intact — it calls
+   `save_state()` and advances `last_run` to *now*, so the mtime/skip comparison
+   becomes invalid (every skill reads as "modified since last_run"). Assess WITHOUT
+   mutating state instead: import the runner and call its functions directly —
+   `import importlib.util; spec=importlib.util.spec_from_file_location("runner", "scripts/critique_10khr_runner.py"); runner=importlib.util.module_from_spec(spec); spec.loader.exec_module(runner)`
+   then `runner.run_full_assessment()` / `runner.score_skill(name, path)`. This keeps
+   `10khr-state.json:last_run` at the prior grind timestamp (the value the skip rule
+   must compare against). Or snapshot `last_run` from the state file before the call
+   and restore it after.
 2. **Skip logic:** lowest skill below 50 — if its SKILL.md `stat` mtime is NOT newer than
    `10khr-state.json` `last_run` AND its heuristic score is `>= 44`, skip to the next lowest.
-   If all unmodified skills score `>= 44`, report "nothing to grind" and stop.
+   If all below-50 skills are unmodified since `last_run` AND score `>= 44`, report
+   "nothing to grind" and stop. (Verified in the 2026-07-18 finch:work pass: 8 eligible
+   targets ground, 9 correctly skipped.)
 3. **Find the WHY:** read `critique_10khr_runner.py:score_skill()` — the heuristic is
    mechanical, not semantic:
    - **D3** penalizes `total_lines > 450` (and code ratio >20%). Cut lines by extracting

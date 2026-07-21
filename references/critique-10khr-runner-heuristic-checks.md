@@ -104,6 +104,10 @@ The runner scans **ALL** scripts (not just the first 3) for `--help`/`usage`/`ar
 
 Note: the check is a literal match on the strings `--help`, `usage`, or `argparse` anywhere in the file. A hand-rolled usage block without those tokens will score as missing — confirm manually with `python3 <script> --help`.
 
+**Two REAL D9 traps caught by the manual `--help` test (2026-07-18 grind):**
+- **Bash `--help` branch that omits `exit 0` fails D9.** A `set -u` script whose `--help|-h)` case sets `TARGET="."` and `echo`s usage but does NOT `exit 0` continues PAST the `case` into the main body — e.g. `if [ ! -d "$TARGET/.git" ]; then echo "No .git..."; exit 2; fi` — so `bash script.sh --help </dev/null` prints usage AND exits 2, not 0. The runner's real D9 test (`bash script.sh --help </dev/null; echo $?`) then reports rc=2 and the heuristic scores D9 as failed even though usage printed. **The only valid bash `--help` branch ENDS with `exit 0` before any positional/main logic.** Found + fixed: `ocas-skilllab/scripts/secret-scan.sh` (branch set `TARGET` and echoed but lacked `exit 0` → rc=2; added `exit 0 ;;`).
+- **Renaming `sys`→`_sys` for the Python guard leaves stale `sys.` references.** The skill's guard example uses `import sys as _sys`. If you apply it but `main()` (or any function) still calls `sys.argv`, Pyright/linters flag `sys is not defined` and the script breaks at load. Either (a) update EVERY `sys.` reference in the file to `_sys.`, or (b) simpler — keep `import sys` (no rename) and write the guard as `if set(sys.argv[1:]) & _HELP_ARGS: print(...); sys.exit(0)`. The rename buys nothing. Found + fixed: `ocas-custodian/scripts/verify_kanban_env.py` (renamed import, then had to fix `home = sys.argv[1]` → `_sys.argv[1]`).
+
 ## D10: Completeness
 
 | Check | Condition | Bonus |

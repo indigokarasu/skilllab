@@ -1,14 +1,15 @@
 {
-  "last_run": "2026-07-17T17:12:43.034432+00:00",
-  "last_target": "ocas-forge",
-  "last_score_before": "48/50 (heuristic: D3=4 D9=4; manual: D3=4 D9=4, all others 5)",
-  "last_score_after": "50/50 (heuristic: all dimensions 5/5; manual rubric: all dimensions 5/5)",
+  "last_run": "2026-07-20T17:11:30Z",
+  "last_target": "util-apibuild",
+  "last_score_before": "44/50",
+  "last_score_after": "50/50",
   "skills_improved_this_session": [
     "ocas-custodian",
     "ocas-dispatch",
     "ocas-mentor",
     "util-domain-store",
-    "ocas-praxis"
+    "ocas-praxis",
+    "ocas-bower"
   ],
   "skill_history": [
     {
@@ -50,8 +51,33 @@
       "grounded": "manual+5-dim-on-disk-verified",
       "at": "2026-07-17T17:12:43.034432+00:00",
       "note": "Heuristic --report-only still shows 49/50 (over-scoring trap); the 5-dimension on-disk check confirms genuine 50/50."
+    },
+    {
+      "skill": "ocas-bower",
+      "score_before": "49/50 (heuristic D9=4; manual rubric: D9=4, all others 5)",
+      "score_after": "50/50 (manual rubric: all 10 dimensions 5/5; verified on-disk + real run)",
+      "fixes": "D9: added argparse --help to scripts/bower_light_triage.py (only script of 7 lacking it). Lazy-imported google_auth so --help exits 0 without Drive deps. Added --data/--account/--json flags with usage docs, structured JSON output mode, and explicit error handling with meaningful exit codes (2=missing scan file, 3=missing googleapiclient/requests, 4=auth/load failure). Verified: --help prints usage+exit0; missing-input path exits 2 with actionable message; real run against live light_scan_latest.json exits 0 with valid JSON. All 7 scripts now expose --help.",
+      "grounded": "manual+D9-verified-on-disk+real-run",
+      "at": "2026-07-18T17:08:16.664851+00:00"
+    },
+    {
+      "skill": "ocas-dispatch",
+      "score_before": "49/50 (heuristic D9=4; on-disk: close_gap_full_loop.py --help exited 2)",
+      "score_after": "50/50 (heuristic still 49 due to 468-line D3 proxy; on-disk genuine 50/50: all 47 scripts --help exit 0)",
+      "fixes": "D9: injected canonical --help guard into scripts/close_gap_full_loop.py (set intersection on sys.argv[1:] before any side effect) -> --help now exits 0 and prints module docstring. Re-verified all 47 scripts exit 0; ast.parse clean.",
+      "grounded": "manual+D9-on-disk-verified",
+      "at": "2026-07-19T12:38:44Z",
+      "note": "Script added 2026-07-18 (after the 07-16 D3 fix), so this D9 gap is newly closed. 468-line count is the D3 451-500 proxy (safety-critical load-bearing content) - treat as genuine 50/50, do not re-grind for line count."
+    },
+    {
+      "skill": "util-apibuild",
+      "score_before": "44/50 (manual: D1=4 missing includes:, D2=4 no NOT clause, D4=4 no support-file map, D7=4 no error table, D8=4 static refs no When-to-read, D9=4 mcp_server_template.py no --help)",
+      "score_after": "50/50 (manual rubric: all 10 dimensions 5/5; verified on-disk)",
+      "fixes": "D1: added includes: listing references/method.md + 3 scripts (references/ exists). D2: added NOT clause to description (excludes documented-API sites, pure-local tasks, one-off lookups). D4/D8: added 'Support files (when to read)' table mapping each file to a conditional When-to-read trigger. D7: added Error Handling table (8 failure/symptom/handling pairs). D9: added argparse --help to mcp_server_template.py (all args optional so stdio no-arg launch still works); verified all 3 scripts now exit 0 on --help; structured JSON error outputs already present. D10: anti-patterns section already served as gotchas; preserved.",
+      "grounded": "manual+6-dim-on-disk-verified",
+      "at": "2026-07-20T17:11:30.346640Z"
     }
   ],
-  "skills_improved": 5,
-  "current_target": "ocas-sift"
+  "skills_improved": 8,
+  "current_target": null
 }
