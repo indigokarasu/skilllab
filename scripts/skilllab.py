@@ -22,7 +22,7 @@ MENU_ITEMS = [
     ("rename",     "Rename — move skill directory, update references"),
     ("delete",     "Delete — archive a skill"),
     ("publish",    "Publish — push skill to GitHub for agentskills.io"),
-    ("sanitize",   "Sanitize — extract inline credentials to reference files"),
+    ("sanitize",   "Sanitize — extract inline credentials, banned phrases, and session logs"),
     ("hygiene",    "Hygiene check — grep false-positives, broken frontmatter"),
     ("quit",       "Exit skill lab"),
 ]
@@ -72,7 +72,7 @@ def draw_scroll_indicators(stdscr, row, scroll, visible, total_items):
         stdscr.addstr(5 + visible - 1, w - 3, "▼", curses.color_pair(4))
 
 
-# ─── Core logic ──────────────────────────────────────────────────────────────
+# ─── Core logic ─────────────────────────────────────────────────────────────
 
 def scan_skills():
     """Return list of (name, path, has_author, has_license, has_triggers, is_archive).
@@ -164,10 +164,31 @@ SECRET_PATTERNS = [
 # File types the sanitizer touches
 _SANITIZE_EXTS = {'.md', '.py', '.json', '.yaml', '.yml', '.txt', '.sh', '.toml'}
 
+# Public-face sanitization: banned taglines, deprecated-tool refs, session logs
+_BANNED_TAGLINES = [
+    'Tell it what you need. It does the work.',
+    'One clear job, done well.',
+]
+_BANNED_TOOL_REFS = [
+    ('Elephas', 'See references/integration-notes.md for current backend architecture.'),
+]
+_SESSION_LOG_PATTERNS = [
+    re.compile(r'^session-2026-\d{2}-\d{2}'),
+    re.compile(r'^session-2026\d{4}'),
+    re.compile(r'^session_\d{8}'),
+    re.compile(r'^dispatch-triggered-scan\.md$'),
+    re.compile(r'^token-repair\.md$'),
+    re.compile(r'^scan_execution_patterns\.md$'),
+    re.compile(r'^taste-scan-env-fix\.md$'),
+]
+_README_TAGLINE_REPLACEMENT = 'Operational skill for the OCAS family.'
+
 
 def sanitize_skill(name, skill_dir):
-    """Scan a skill directory for inline secrets and replace them with
-    env-var references (e.g. ${STRIPE_LIVE_SECRET_KEY}). Returns a summary
+    """Scan a skill directory for inline secrets, banned public-facing phrases,
+    deprecated-tool references, and publishable session-log artifacts.
+    Replaces secrets with env-var references, strips/rewrites banned prose,
+    and quarantines session-log reference files. Returns a summary
     dict mapping relative file path -> {pattern: replacement_count}."""
     import glob as _glob
 
@@ -176,6 +197,9 @@ def sanitize_skill(name, skill_dir):
         return {}
 
     summary = {}
+    session_log_quarantine_dir = os.path.join(skill_dir, '.archive', 'session-logs-export')
+    os.makedirs(session_log_quarantine_dir, exist_ok=True)
+
     for path in sorted(_glob.glob(os.path.join(skill_dir, '**', '*'), recursive=True)):
         if not os.path.isfile(path):
             continue
@@ -190,14 +214,46 @@ def sanitize_skill(name, skill_dir):
             continue
         original = content
         counts = {}
+        rel = os.path.relpath(path, skill_dir)
+        basename_lower = os.path.basename(path).lower()
+        is_readme = rel.lower() == 'readme.md'
+
+        # secrets
         for pat, repl in SECRET_PATTERNS:
             content, n = pat.subn(repl, content)
             if n:
                 counts[pat.pattern] = counts.get(pat.pattern, 0) + n
+
+        # banned taglines in README / SKILL description prose
+        if is_readme or basename_lower == 'skill.md':
+            for tagline in _BANNED_TAGLINES:
+                if tagline in content:
+                    replacement = _README_TAGLINE_REPLACEMENT if is_readme else ''
+                    content = content.replace(tagline, replacement)
+                    counts[f'banned_tagline:{tagline}'] = counts.get(f'banned_tagline:{tagline}', 0) + 1
+
+        # deprecated-tool references
+        for banned, replacement in _BANNED_TOOL_REFS:
+            if banned in content:
+                content = content.replace(banned, replacement)
+                counts[f'banned_tool_ref:{banned}'] = counts.get(f'banned_tool_ref:{banned}', 0) + 1
+
+        # quarantine session-log reference files
+        if any(pat.search(os.path.basename(path)) for pat in _SESSION_LOG_PATTERNS):
+            quarantine_path = os.path.join(session_log_quarantine_dir, os.path.basename(path))
+            try:
+                os.replace(path, quarantine_path)
+                counts['session_log_quarantined'] = counts.get('session_log_quarantined', 0) + 1
+            except OSError:
+                pass
+            if counts.get('session_log_quarantined'):
+                summary[rel] = counts
+                continue
+
         if content != original:
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(content)
-            summary[os.path.relpath(path, skill_dir)] = counts
+            summary[rel] = counts
     return summary
 
 
@@ -271,12 +327,12 @@ def draw_skill_list(stdscr, skills, title, filter_fn=None):
             idx = scroll + i
             if idx >= len(filtered):
                 break
-            name, path, info, is_archive = filtered[idx]
+            name, path, info, is_arch = filtered[idx]
             y = 2 + i
 
             author_flag = "✓" if info["author"] else "✗"
             lic_flag = "✓" if info["license"] else "✗"
-            arch_tag = " [ARCHIVE]" if is_archive else ""
+            arch_tag = " [ARCHIVE]" if is_arch else ""
 
             flags = f"  a:{author_flag} l:{lic_flag}{arch_tag}"
             line = f"  {name}{flags}"
@@ -287,7 +343,7 @@ def draw_skill_list(stdscr, skills, title, filter_fn=None):
                     desc = f"    {info['description'][:w-6]}"
                     stdscr.addstr(y + 1, 0, desc, curses.color_pair(4))
             else:
-                color = curses.color_pair(6) if not info["author"] and not is_archive else curses.color_pair(2)
+                color = curses.color_pair(6) if not info["author"] and not is_arch else curses.color_pair(2)
                 stdscr.addstr(y, 0, line[:w-1], color)
 
         stdscr.refresh()
@@ -384,6 +440,7 @@ def run_action(action, stdscr):
                 curses.endwin()
                 print(f"\nUse: skill_manage to merge {selected} into target")
                 print("Then archive the source directory.")
+            curses.initscr()
 
     elif action == "rename":
         selected = draw_skill_list(stdscr, skills, "Rename — select skill", lambda n, p, i, a: not a)
@@ -408,7 +465,7 @@ def run_action(action, stdscr):
             if confirm(stdscr, f"Archive {selected}?"):
                 src = os.path.join(SKILLS_DIR, selected)
                 dst = os.path.join(ARCHIVE_DIR, selected)
-                os.makedirs(ARCHIVE_DIR, exist_ok=True)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
                 os.rename(src, dst)
                 curses.endwin()
                 print(f"  Archived {selected}")
@@ -436,7 +493,8 @@ def run_action(action, stdscr):
             curses.endwin()
             print(f"\nSanitizing {selected}:")
             print(f"  Scan for: _KEY, _SECRET, TOKEN, OAuth fields, absolute paths")
-            print(f"  Create references/<purpose>.md with credential details")
+            print(f"  Strip banned taglines/tool refs and quarantine session logs")
+            print(f"  Create references/<purpose>.md with credential/tooling details")
             print(f"  Replace inline with: See references/<file>.md for <description>.")
             input("\n  Press Enter to continue...")
             curses.initscr()
