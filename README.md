@@ -1,7 +1,7 @@
 # skilllab
 
 <p align="center">
-<img src="./assets/readme/hero.svg" width="100%" alt="skilllab: skill library maintenance — audit, merge, rename, delete, consolidate, publish, sanitize, and critique">
+<img src="./assets/readme/hero.jpg" width="100%" alt="skilllab: skill library maintenance — audit, merge, rename, delete, consolidate, publish, sanitize, and critique">
 </p>
 
 skilllab — skilllab: skill library maintenance — audit, merge, rename, delete, consolidate, publish, sanitize, and critique
