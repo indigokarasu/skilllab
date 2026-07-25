@@ -45,7 +45,7 @@ conditional **When to read** column so the agent loads only what each operation 
 | `references/critique-2026-06-15-session-learnings.md` | June 15 session — critique workflow validation, failed-attempt encoding anti-pattern, profile↔monorepo sync |
 | `references/recursive-skill-discovery.md` | Before writing any skill discovery code — recursive glob pattern, symlink dedup |
 | `references/skill-architecture-sprawl-audit-2026-06-17.md` | Skill sprawl audit — merge candidates, anti-patterns, class-level umbrella principle |
-| `references/soul-repo-skill-install-gap.md` | Skills in `<soul-repo>/skills/` not visible until installed in active profile — detection + fix |
+| `references/soul-repo-skill-install-gap.md` | Skills in `<fs-root>/soul/skills/` not visible until installed in active profile — detection + fix |
 | `references/monorepo-skill-detection.md` | Before creating git repos for skills — detect monorepo source: fields and sync to the correct repo |
 | `references/10khr-scope-clarification.md` | Before running 10khr or autofix — clarifies skill library vs code repo targeting |
 | `references/tool-integration-pattern.md` | Before integrating an external tool — evaluation flow + concrete example |

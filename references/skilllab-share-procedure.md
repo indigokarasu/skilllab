@@ -33,7 +33,7 @@ It flags any `GENIE_*` / non-secret env-var config read in `scripts/` or env-var
 - **No external dependencies:** Skills should use stdlib + existing Hermes tools. If a skill requires pip packages, it belongs in Skills Hub, not optional-skills.
 - **Tests are required:** Every skill needs `tests/test_<skill>_skill.py` with at least import, help, dry-run, and frontmatter tests.
 - **Author is the agent:** Use the agent's own name/GitHub, not the user's. The user directs, the agent authors.
-- **No user data:** Never include the user's name, email, paths, or personal config in the submitted skill. All paths should be generic (`~/.hermes/`, `~/`, etc.).
+- **No user data:** Never include the user's name, email, paths, or personal config in the submitted skill. All paths should be generic (`~/.hermes/`, `<fs-root>/`, etc.).
 
 See `references/skill-sanitize-checklist.md` for the full sanitize procedure.
 
