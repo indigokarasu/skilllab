@@ -55,4 +55,8 @@ metadata:
 1. Update cron job prompts referencing old skill names/paths
 2. Update MEMORY.md entries referencing old skill names
 3. Verify YAML frontmatter after edits
+<<<<<<< Updated upstream
 4. Check for doubled author fields (replace-all can double already-correct values like `Indigo Karasu (indigokarasu)` → `Indigo Karasu (indigokarasu) (indigokarasu)`)
+=======
+4. Check for doubled author fields (replace-all can double already-correct values like `<agent-name> (<agent-handle>)` → `<agent-name> (<agent-handle>) (<agent-handle>)`)
+>>>>>>> Stashed changes
