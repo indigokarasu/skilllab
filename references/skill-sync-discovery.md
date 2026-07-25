@@ -1,7 +1,7 @@
 # Skill-sync discovery pattern (references)
 
 Reusable building blocks for the unified `skill-sync-all.sh`
-(at `<hermes-home>/scripts/skill-sync-all.sh`). Embedded here so
+(at `<hermes-home>/profiles/indigo/scripts/skill-sync-all.sh`). Embedded here so
 the pattern survives even if the script is moved or rewritten.
 
 ## 1. Discovered-skills helper (no hard-coded lists)

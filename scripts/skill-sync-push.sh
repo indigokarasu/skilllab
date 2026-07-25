@@ -10,15 +10,15 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
   echo "Commit + push every local skill repo under SKILLS_ROOT that has uncommitted changes"
   echo "or is ahead of its upstream. Skips repos where the secret-scan gate fails."
   echo "  DRY_RUN=1  -> no-op report (does not commit or push). Default: 0."
-  echo "  Default SKILLS_ROOT: <hermes-home>/skills"
+  echo "  Default SKILLS_ROOT: ~/.hermes/profiles/indigo/skills"
   exit 0
 fi
-SKILLS_ROOT="${1:-<hermes-home>/skills}"
+SKILLS_ROOT="${1:-~/.hermes/profiles/indigo/skills}"
 SECRET_SCAN="${SKILLS_ROOT}/ocas-skilllab/scripts/secret-scan.sh"
 IDENTITY_NAME="Indigo Karasu"
 IDENTITY_EMAIL="mx.indigo.karasu@gmail.com"
 DRY_RUN="${DRY_RUN:-0}"
-LOG=<hermes-home>/cron/output/skill-sync-push.log
+LOG=~/.hermes/profiles/indigo/cron/output/skill-sync-push.log
 mkdir -p "$(dirname "$LOG")"
 
 ts() { date -u +%Y-%m-%dT%H:%M:%SZ; }

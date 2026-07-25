@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 
 
 def _runner_path():
-    hermes_root = os.environ.get("HERMES_ROOT", "<hermes-root>")
+    hermes_root = os.environ.get("HERMES_ROOT", "~/.hermes")
     return os.path.join(
         hermes_root, "profiles", "indigo", "skills",
         "ocas-skilllab", "scripts", "critique_10khr_runner.py",
