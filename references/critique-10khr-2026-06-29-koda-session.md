@@ -4,7 +4,7 @@
 
 **Library state:** 7/26 at 50/50 (19 remaining)
 
-## KODA Profile vs Indigo Profile: Key Differences
+## KODA Profile vs the agent Profile: Key Differences
 
 ### 1. Imported community skills dominate the bottom
 
@@ -22,12 +22,12 @@ Skills like `github-pr-workflow`, `github-issues`, `github-github-repo-managemen
 
 ### 3. The cross-profile write guard
 
-When the operator says "KODA's skills," he means the profile at `~/.hermes/profiles/koda/skills/`. The active profile is `indigo`. Writing to KODA's skill directory triggers Hermes's cross-profile soft guard. **Fix:** use `cross_profile=True` on `write_file`/`patch` calls. The skilllab skill already documents scanning across profiles for reads, but should explicitly warn about the write guard for KODA-targeted operations.
+When <operator> says "KODA's skills," he means the profile at `~/.hermes/profiles/koda/skills/`. The active profile is `indigo`. Writing to KODA's skill directory triggers Hermes's cross-profile soft guard. **Fix:** use `cross_profile=True` on `write_file`/`patch` calls. The skilllab skill already documents scanning across profiles for reads, but should explicitly warn about the write guard for KODA-targeted operations.
 
 ### 4. Scoring distribution
 
 KODA starts with a different quality profile than indigo:
-- Indigo (per June 29): 61/61 at 50/50, average ~49/50
+- the agent (per June 29): 61/61 at 50/50, average ~49/50
 - KODA (this session): 0/26 at 50/50, average 36.5/50
 
 The gap is primarily in: D8 (progressive disclosure), D3 (conciseness), D7 (error handling), D2 (description quality), D10 (completeness). These are systemic — most KODA skills need `references/` dirs created, error handling sections added, and descriptions reformatted.
