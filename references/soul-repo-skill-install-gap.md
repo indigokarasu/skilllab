@@ -41,4 +41,4 @@ When writing a new skill to the SOUL repo, ALWAYS also install it to the active 
 
 ## Real Case
 
-`ocas-actualization` was written to `<soul-repo>/skills/ocas-actualization/` on June 14. It was never installed in the active profile. For 4 days, any attempt to invoke it returned "skill not found." It was only discovered when the operator asked about it and I searched the SOUL repo directory directly.
+`ocas-actualization` was written to `<soul-repo>/skills/ocas-actualization/` on June 14. It was never installed in the active profile. For 4 days, any attempt to invoke it returned "skill not found." It was only discovered when <operator> asked about it and I searched the SOUL repo directory directly.
