@@ -85,7 +85,7 @@ Skills scoring 100/100 on both quality and security share these traits:
 Move detailed operational content to `references/` files. Keep in SKILL.md: commands, triggers, core procedures, essential pitfalls. Move to references: troubleshooting guides, platform compatibility tables, verbose examples, known fix registries.
 
 ### Credential Harvesting / Sensitive File Access False Positives
-Move credential-handling code blocks (token reads, OAuth diagnostics) to reference files. Replace inline code with `See references/xxx.md`. **Also remove hardcoded filesystem paths** — any absolute path under `~/`, `/home/`, or `/etc/` in operational examples will be flagged. Replace with template variables: `{agent_root}`, `{skill_root}`, `{skill_dir}`. Exception: paths in Gotchas describing legacy/stale paths are fine.
+Move credential-handling code blocks (token reads, OAuth diagnostics) to reference files. Replace inline code with `See references/xxx.md`. **Also remove hardcoded filesystem paths** — any absolute path under `<fs-root>/`, `/home/`, or `/etc/` in operational examples will be flagged. Replace with template variables: `{agent_root}`, `{skill_root}`, `{skill_dir}`. Exception: paths in Gotchas describing legacy/stale paths are fine.
 
 ### Data Exfiltration via curl
 If the curl is a legitimate operational requirement (API calls, health checks), accept the score impact or move to reference files. For localhost health checks, the scanner still flags them but they're functionally necessary.

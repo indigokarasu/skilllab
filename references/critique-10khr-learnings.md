@@ -33,7 +33,7 @@ _This file accumulates reusable fix patterns across all 10khr sessions. Session-
 6. `license: proprietary` is a D1 error — flag immediately
 7. Second person in descriptions ("you", "your") is a D2 error
 8. **Sequential patch fragility**: Multiple patches on one SKILL.md cause line-number drift and heading corruption. Prefer full-file rewrite for >3 section extractions. Always grep for `##` duplicates after any structural patch.
-9. **Absolute path hygiene**: When moving code to references, scan for `~/`, `/home/`, `/etc/` and replace with `{agent_root}/`
+9. **Absolute path hygiene**: When moving code to references, scan for `<fs-root>/`, `/home/`, `/etc/` and replace with `{agent_root}/`
 10. **Cross-skill reference verification**: Verify paths to other skills' files exist before embedding them
 
 ## Session: 2026-05-30 — ocas-custodian (43 → 47/50)
@@ -92,7 +92,7 @@ Sequential `patch` calls on the same SKILL.md are HIGHLY fragile. This session n
 
 ### Key learning: Path hygiene in moved code
 When moving code blocks to reference files:
-1. Scan for absolute paths (`~/`, `/home/`, `/etc/`) → replace with `{agent_root}/`
+1. Scan for absolute paths (`<fs-root>/`, `/home/`, `/etc/`) → replace with `{agent_root}/`
 2. Scan for cross-skill paths → verify existence before embedding
 3. Replace interactive commands with hardcoded paths with template-based equivalents
 
