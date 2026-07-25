@@ -1,7 +1,11 @@
 # Skill-sync discovery pattern (references)
 
 Reusable building blocks for the unified `skill-sync-all.sh`
+<<<<<<< Updated upstream
 (at `<hermes-home>/profiles/indigo/scripts/skill-sync-all.sh`). Embedded here so
+=======
+(at `~/.hermes/profiles/indigo/scripts/skill-sync-all.sh`). Embedded here so
+>>>>>>> Stashed changes
 the pattern survives even if the script is moved or rewritten.
 
 ## 1. Discovered-skills helper (no hard-coded lists)
@@ -35,7 +39,7 @@ will pull nested sibling skills into the working tree and pollute the commit
 committed `ocas-10xeng/ocas-10xeng-review/…` → pushed → required `force-with-lease` cleanup).
 
 ```bash
-git -C "$d" remote add origin "git@github.com:indigokarasu/$rmt_name.git" 2>/dev/null
+git -C "$d" remote add origin "git@github.com:<agent-handle>/$rmt_name.git" 2>/dev/null
 git -C "$d" fetch origin 2>/dev/null
 git -C "$d" add -A; git -C "$d" commit -q -m "chore: initial commit of $base" 2>/dev/null || true
 git -C "$d" pull --rebase origin main 2>/dev/null || true   # layer local on remote; no overwrite
@@ -51,9 +55,9 @@ If pollution was already pushed: remove the subdirs, commit, then
 ```bash
 local repo="${base#ocas-}"          # strip prefix for the NEW repo name
 local rmt_exists="n" rmt_name="$repo"
-if   gh repo view "indigokarasu/$repo" >/dev/null 2>&1; then rmt_exists="y"; rmt_name="$repo"
-elif gh repo view "indigokarasu/$base" >/dev/null 2>&1; then rmt_exists="y"; rmt_name="$base"; fi
-# only `gh repo create indigokarasu/$repo` when rmt_exists=n
+if   gh repo view "<agent-handle>/$repo" >/dev/null 2>&1; then rmt_exists="y"; rmt_name="$repo"
+elif gh repo view "<agent-handle>/$base" >/dev/null 2>&1; then rmt_exists="y"; rmt_name="$base"; fi
+# only `gh repo create <agent-handle>/$repo` when rmt_exists=n
 ```
 Checking BOTH the stripped and legacy prefixed name prevents creating a second
 repo when migrating prefixed→stripped naming.
