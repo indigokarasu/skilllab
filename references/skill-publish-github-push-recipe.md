@@ -6,14 +6,14 @@ The `skill-publish` skill describes the audit workflow step, but the actual GitH
 
 ```python
 # 1. Create the repo (private)
-gh repo create indigokarasu/skill-name --private --description "Description here"
+gh repo create <agent-handle>/skill-name --private --description "Description here"
 
 # 2. Prepare files in a temp staging directory
 mkdir -p /tmp/skill-export/skill-name/{references,scripts}
 # ... copy or write SKILL.md, README.md, LICENSE, .gitignore, etc.
 
 # 3. Clone, copy, commit, push
-git clone https://github.com/indigokarasu/skill-name.git /tmp/push-skill-name
+git clone https://github.com/<agent-handle>/skill-name.git /tmp/push-skill-name
 cp -r /tmp/skill-export/skill-name/. /tmp/push-skill-name/
 cd /tmp/push-skill-name
 git config user.email "contact@example.com"
@@ -53,6 +53,6 @@ Add `sent-*.jsonl`, `feedback-*.jsonl`, `*_cookies.json`, and any file containin
 
 After pushing:
 ```bash
-gh repo view indigokarasu/skill-name --json name,isPrivate,url
+gh repo view <agent-handle>/skill-name --json name,isPrivate,url
 ```
 Confirm `isPrivate: true` before sharing the URL.
