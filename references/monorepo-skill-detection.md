@@ -27,11 +27,11 @@ for path in glob.glob(f"{skills_dir}/*/SKILL.md"):
 
 | Monorepo | Skills |
 |----------|--------|
-| `indigokarasu/utilities` | util-buy, util-draw, util-dreamhost, util-github, util-headhunter, util-iamwrite, util-rapidapi, util-reddit, util-telegram-miniapp, util-voice-call, util-vpn, util-web-extract, util-wiki |
+| `<agent-handle>/utilities` | util-buy, util-draw, util-dreamhost, util-github, util-headhunter, util-iamwrite, util-rapidapi, util-reddit, util-telegram-miniapp, util-voice-call, util-vpn, util-web-extract, util-wiki |
 
 ## Sync Procedure for Monorepo Skills
 
-1. Clone monorepo: `git clone https://github.com/indigokarasu/utilities.git /tmp/utilities`
+1. Clone monorepo: `git clone https://github.com/<agent-handle>/utilities.git /tmp/utilities`
 2. Copy skill files: `cp ~/.hermes/skills/<skill>/SKILL.md /tmp/utilities/<subdir>/SKILL.md`
 3. Sync references: `rsync -a --delete ~/.hermes/skills/<skill>/references/ /tmp/utilities/<subdir>/references/`
 4. Commit and push monorepo: `cd /tmp/utilities && git add -A && git commit -m "sync: update <skill>" && git push origin local`

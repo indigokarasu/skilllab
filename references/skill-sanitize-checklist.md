@@ -55,8 +55,13 @@ Owner names, spouse names, contact names, and other personal identifiers must be
 
 | Pattern | Example | Fix |
 |---------|---------|-----|
+<<<<<<< Updated upstream
 | Owner's full name | "<operator> <operator-last>" | Replace with "the owner" |
 | Owner's first name alone | "<operator> asks" | Replace with "the owner asks" or "the owner asks" |
+=======
+| Owner's full name | "<user>" | Replace with "the owner" |
+| Owner's first name alone | "<operator> asks" | Replace with "the owner asks" or "the owner asks" |
+>>>>>>> Stashed changes
 | Family/spouse names | " "Marcus" (in examples) | Replace with generic: "spouse", "colleague", "friend" |
 | Personal locations | "San Francisco, CA" as default | Replace with configurable or "last known" |
 | Personal email addresses | `the operator@email.com` | Replace with `{owner_email}` or remove |
@@ -71,7 +76,11 @@ Credentials often survive the first pass in these locations:
 - [ ] **Gotchas section** — repeats "<operator>'s token must NEVER..." or account separation reminders
 - [ ] **Initialization/setup code** — env var names in setup instructions (e.g., `export SEARXNG_URL=...`)
 - [ ] **Storage layout trees** — hardcoded DB/file paths (replace with `{agent_root}/...`)
+<<<<<<< Updated upstream
 - [ ] **Script invocation examples** — `python <hermes-home>/skills/...` (replace with `{skill_root}/...`)
+=======
+- [ ] **Script invocation examples** — `python ~/.hermes/skills/...` (replace with `{skill_root}/...`)
+>>>>>>> Stashed changes
 - [ ] **Support file pointers** — the pointer line itself should NOT contain credential names
 - [ ] **Cooperation/interfaces sections** — may reference auth mechanisms
 

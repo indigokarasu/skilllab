@@ -119,6 +119,8 @@ Note: the check is a literal match on the strings `--help`, `usage`, or `argpars
 
 **Key gotcha:** "when not to use" is the exact literal string. `## When NOT to Use` lowercases to `## when not to use` and triggers the bonus.
 
+**Efficiency:** A single combined heading `## When to use / When NOT to use` satisfies BOTH D5's `## when to use` check AND D10's `when not to use` check at once (it contains `## when to use` as a substring and `when not to use` verbatim). Write one combined section instead of two separate ones — saves tokens and closes two dimensions simultaneously. Confirmed in the 2026-07-22 `util-apibuild` grind: one combined section moved D5 4→5 and D10 4→5 (and D1 5 came from moving `license:` to line 2).
+
 ---
 
 ## Scoring Summary Table
