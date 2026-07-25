@@ -35,9 +35,9 @@ from datetime import datetime, timezone
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 # Default: scan the indigo profile (active profile) recursively
-# Resolve against HERMES_ROOT or /root/.hermes to avoid broken ~ expansion
-# when HOME is set to a profile chroot (e.g., /root/.hermes/profiles/indigo/home)
-_HERMES_ROOT = os.environ.get("HERMES_ROOT", "/root/.hermes")
+# Resolve against HERMES_ROOT or ~/.hermes to avoid broken ~ expansion
+# when HOME is set to a profile chroot (e.g., ~/.hermes/profiles/indigo/home)
+_HERMES_ROOT = os.environ.get("HERMES_ROOT", "~/.hermes")
 DEFAULT_SKILLS_DIR = os.path.join(_HERMES_ROOT, "profiles", "indigo", "skills")
 DEFAULT_PROFILE_SKILLS_DIR = os.path.join(_HERMES_ROOT, "skills")
 TARGET_SCORE = 50
@@ -84,7 +84,7 @@ def find_all_skills(skills_dir: str = None, all_profiles: bool = False) -> list:
     if all_profiles:
         # Scan all profiles under <HERMES_ROOT>/profiles/
         # Use HERMES_ROOT (NOT expanduser("~/.hermes/profiles")): under a profile
-        # chroot (HOME=/root/.hermes/profiles/<profile>/home) expanduser resolves to
+        # chroot (HOME=~/.hermes/profiles/<profile>/home) expanduser resolves to
         # the active profile's home, silently dropping every OTHER profile (e.g. koda).
         # Confirmed bug 2026-07-15 — --all-profiles reported 60 skills and missed
         # koda/ocas-eng-debug until this was fixed.

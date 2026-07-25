@@ -19,7 +19,7 @@ Savings: 21 lines
 ### Fix 2: Remove duplicate section (D3)
 
 "NEVER MODIFY the operator INBOX" section (3 lines of prose) was a standalone section that duplicated:
-- Safety rule #7 in the Safety Guardrails section (`the operator inbox hard rule`)
+- Safety rule #7 in the Safety Guardrails section (`<operator> inbox hard rule`)
 - A sentence embedded in Q1 of the Dual-Question Triage Framework
 
 **Pattern:** When a safety-critical rule is stated in THREE locations, keep only the two that appear in different logical groupings (safety rules + triage flow). Remove the standalone amplification section.
@@ -34,7 +34,7 @@ The "Journal already evaluated?" sentence under the table was IDENTICAL to a sen
 
 ### Fix 5: Add "Why" to safety rule #1 (D6 4→5)
 
-Added `**Why:** This account is the operator's identity. Unauthorized sends are impersonation with legal liability.` to the first hard rule. The heuristic requires the literal word "why" somewhere in content. One sentence satisfied D6.
+Added `**Why:** This account is <operator>'s identity. Unauthorized sends are impersonation with legal liability.` to the first hard rule. The heuristic requires the literal word "why" somewhere in content. One sentence satisfied D6.
 
 ## New Pattern: Progressive Support File Extraction
 
