@@ -8,11 +8,11 @@
 
 ## Prerequisites
 
-- `gh` CLI authenticated (`gh auth status` — should show `indigokarasu` active)
+- `gh` CLI authenticated (`gh auth status` — should show `<agent-handle>` active)
 - Git credential helper is `gh auth git-credential` (check: `git config --global credential.helper`)
-- **Do NOT embed tokens in remote URLs.** Use clean URLs like `https://github.com/indigokarasu/repo.git` and let `gh` handle auth. If a remote URL contains a corrupted/masked token (e.g., `ghp_rB...y5G7`), fix it:
+- **Do NOT embed tokens in remote URLs.** Use clean URLs like `https://github.com/<agent-handle>/repo.git` and let `gh` handle auth. If a remote URL contains a corrupted/masked token (e.g., `ghp_rB...y5G7`), fix it:
   ```bash
-  git remote set-url origin https://github.com/indigokarasu/repo.git
+  git remote set-url origin https://github.com/<agent-handle>/repo.git
   ```
 
 ## Full Sync Workflow
@@ -50,7 +50,7 @@ For skills with no `.git`:
 ```bash
 cd ~/.hermes/skills/<skill>
 git init
-git remote add origin https://github.com/indigokarasu/<repo-name>.git
+git remote add origin https://github.com/<agent-handle>/<repo-name>.git
 git fetch origin
 # Check if repo exists on GitHub (if ls-remote fails, create it first with gh repo create)
 git branch -m master main   # rename if needed
@@ -65,7 +65,7 @@ cd ~/.hermes/skills/<skill>
 # Remove broken remote if present
 git remote remove origin
 # Add clean URL (no embedded token)
-git remote add origin https://github.com/indigokarasu/<repo-name>.git
+git remote add origin https://github.com/<agent-handle>/<repo-name>.git
 git fetch origin
 ```
 
@@ -113,10 +113,10 @@ git rev-parse --abbrev-ref @{upstream}  # origin/main
 
 | Situation | Fix |
 |-----------|-----|
-| Token embedded in remote URL is corrupted/masked | `git remote set-url origin https://github.com/indigokarasu/repo.git` |
+| Token embedded in remote URL is corrupted/masked | `git remote set-url origin https://github.com/<agent-handle>/repo.git` |
 | Local branch is `master`, remote is `main` | `git branch -m master main && git push -u origin main --force` |
 | Detached HEAD after interrupted rebase | `git rebase --abort`, then checkout/create branch |
-| Repo doesn't exist on GitHub yet | `gh repo create indigokarasu/repo-name --private --description "..."` then add remote and push |
+| Repo doesn't exist on GitHub yet | `gh repo create <agent-handle>/repo-name --private --description "..."` then add remote and push |
 | Skill reappears as uncommitted after push | A concurrent process may be generating files — commit and push again, then verify |
 
 ## Repo Name Mapping
@@ -129,8 +129,8 @@ Most `ocas-<name>` skills map to GitHub repos named `<name>`:
 ## Monorepo Skills (source: points to a subdirectory)
 
 Some skills have `source:` pointing to a subdirectory within a monorepo, NOT a standalone repo. Example:
-- `util-buy` → `source: https://github.com/indigokarasu/utilities/tree/main/buy`
-- `util-wiki` → `source: https://github.com/indigokarasu/utilities/tree/main/wiki`
+- `util-buy` → `source: https://github.com/<agent-handle>/utilities/tree/main/buy`
+- `util-wiki` → `source: https://github.com/<agent-handle>/utilities/tree/main/wiki`
 
 **CRITICAL:** Before creating a git repo for a skill, ALWAYS check the `source:` field in frontmatter. If it points to a monorepo subdirectory:
 1. Do NOT create a standalone repo
@@ -142,7 +142,7 @@ Some skills have `source:` pointing to a subdirectory within a monorepo, NOT a s
 
 ```bash
 # 1. Clone the monorepo (if not already)
-git clone https://github.com/indigokarasu/utilities.git /tmp/utilities
+git clone https://github.com/<agent-handle>/utilities.git /tmp/utilities
 
 # 2. Copy skill files to monorepo subdirectory
 cp ~/.hermes/skills/util-buy/SKILL.md /tmp/utilities/buy/SKILL.md

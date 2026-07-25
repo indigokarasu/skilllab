@@ -16,7 +16,7 @@ fi
 SKILLS_ROOT="${1:-~/.hermes/profiles/indigo/skills}"
 SECRET_SCAN="${SKILLS_ROOT}/ocas-skilllab/scripts/secret-scan.sh"
 IDENTITY_NAME="the agent"
-IDENTITY_EMAIL="mx.indigo.karasu@gmail.com"
+IDENTITY_EMAIL="<third-party-or-user-email>"
 DRY_RUN="${DRY_RUN:-0}"
 LOG=~/.hermes/profiles/indigo/cron/output/skill-sync-push.log
 mkdir -p "$(dirname "$LOG")"
