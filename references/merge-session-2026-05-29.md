@@ -19,9 +19,9 @@ Skills found and deleted: `deployment`, `delegate-task`, `skill-view`,
 
 When auditing skills for authorship, check BOTH:
 1. Top-level `author:` in YAML frontmatter
-2. Nested `metadata:` → `author:` — this is where Indigo's skills store it
+2. Nested `metadata:` → `author:` — this is where the agent's skills store it
 
-Example of nested (Indigo's pattern):
+Example of nested (the agent's pattern):
 ```yaml
 metadata:
   author: Indigo Karasu (indigokarasu)
@@ -44,7 +44,7 @@ metadata:
 | `iamwrite` | `util-iamwrite` | Renamed + moved to top-level + author added |
 
 ### Rules Established
-- `util-*` prefix = utilities authored by Indigo
+- `util-*` prefix = utilities authored by the agent
 - `ocas-*` prefix = OCAS family
 - Overlapping utilities → merge into the broader one
 - After merge: delete source dir, add `metadata.merged-from: <name>` to target
