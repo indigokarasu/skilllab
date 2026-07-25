@@ -12,7 +12,7 @@ Your glitch design language lives at `design/glitch-aesthetic/`:
 - `telemetry-bleed.md` — visitor telemetry harvester, three-mode bleed engine
 - `syslog-panel.md` — syslog panel layout, typing animation, entry lifecycle
 
-Created: May 27 2026. Moved from `/root/references/creative/` to `~/.hermes/references/design/glitch-aesthetic/` on June 1 2026.
+Created: May 27 2026. Moved from `<fs-root>/references/creative/` to `~/.hermes/references/design/glitch-aesthetic/` on June 1 2026.
 
 This is separate from the four reference repos below. Use these when the project calls for polished, established design languages. Use your glitch aesthetic when that's the right fit.
 
@@ -69,7 +69,7 @@ Four repos + one enforcement skill system, ~1,550 files, ~32MB of design system 
 
 ## Reference file path convention
 
-Reference files for design live under `~/.hermes/references/design/`. This is the current convention. If you find design references at old paths like `/root/references/creative/`, migrate them here.
+Reference files for design live under `~/.hermes/references/design/`. This is the current convention. If you find design references at old paths like `<fs-root>/references/creative/`, migrate them here.
 
 Responsive-design skill references live under `~/.hermes/profiles/indigo/skills/responsive-design/references/`.
 

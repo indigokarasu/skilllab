@@ -19,7 +19,7 @@ Search the full SKILL.md for these patterns after edits:
 | `google_auth` | Auth helper references with paths |
 | `_URL` env vars | Auth-configuring URL vars (e.g., `SEARXNG_URL`) |
 | `credentials/` | File paths to credential files |
-| `/root/` | Hardcoded absolute paths under root home |
+| `<fs-root>/` | Hardcoded absolute paths under root home |
 | `/home/` | Hardcoded absolute paths under user home |
 | `/etc/` | Hardcoded absolute paths under system config |
 
@@ -96,9 +96,9 @@ These patterns trigger security scanner flags on agentskill.sh even when no actu
 |---------|-------------|-----|
 | Literal `~/.hermes/` paths in examples, descriptions, or "how to" sections | Sensitive File Access (medium) | Replace with descriptive prose: "via the agent's session store" instead of `~/.hermes/sessions/` |
 | Literal `~/.config/` or `~/.local/` paths | Sensitive File Access (medium) | Replace with `{config_root}` or describe functionally |
-| Absolute paths in code examples (`/root/`, `/home/`, `/etc/`) | Sensitive File Access | Use `{agent_root}`, `{skill_root}`, or `/path/to/...` placeholder |
+| Absolute paths in code examples (`<fs-root>/`, `/home/`, `/etc/`) | Sensitive File Access | Use `{agent_root}`, `{skill_root}`, or `/path/to/...` placeholder |
 
-**Rule:** If a path appears in a *descriptive or instructional* context (not a Gotcha documenting a legacy path), replace it with functional prose or a template variable. Paths in Gotchas describing problems ("legacy path `/root/...` may be stale") are fine — they're documenting a gotcha, not prescribing a path.
+**Rule:** If a path appears in a *descriptive or instructional* context (not a Gotcha documenting a legacy path), replace it with functional prose or a template variable. Paths in Gotchas describing problems ("legacy path `<fs-root>/...` may be stale") are fine — they're documenting a gotcha, not prescribing a path.
 
 ### Language Triggers
 
