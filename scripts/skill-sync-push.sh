@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # skill-sync-push.sh — commit + push all local skill repos that have changes.
 # Idempotent: only touches repos with uncommitted changes OR commits ahead of their
-# upstream; skips if secret-scan fails. Sets the Indigo Karasu identity locally
+# upstream; skips if secret-scan fails. Sets the the agent identity locally
 # (the host global git config defaults to "Koda", a different profile).
 # Author: Indigo Karasu. Invoked by cron 'ocas-skilllab-sync' (daily 04:00).
 set -u
@@ -15,7 +15,7 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 fi
 SKILLS_ROOT="${1:-~/.hermes/profiles/indigo/skills}"
 SECRET_SCAN="${SKILLS_ROOT}/ocas-skilllab/scripts/secret-scan.sh"
-IDENTITY_NAME="Indigo Karasu"
+IDENTITY_NAME="the agent"
 IDENTITY_EMAIL="mx.indigo.karasu@gmail.com"
 DRY_RUN="${DRY_RUN:-0}"
 LOG=~/.hermes/profiles/indigo/cron/output/skill-sync-push.log
@@ -47,7 +47,7 @@ for d in "$SKILLS_ROOT"/*/; do
       secret_blocked=$((secret_blocked+1)); continue
     fi
   fi
-  # set local identity (Indigo, not the global Koda default)
+  # set local identity (the agent, not the global Koda default)
   git -C "$d" config user.name "$IDENTITY_NAME" 2>/dev/null
   git -C "$d" config user.email "$IDENTITY_EMAIL" 2>/dev/null
   if [ "$DRY_RUN" = "1" ]; then
