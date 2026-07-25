@@ -37,7 +37,7 @@ from datetime import datetime, timezone
 # Default: scan the indigo profile (active profile) recursively
 # Resolve against HERMES_ROOT or ~/.hermes to avoid broken ~ expansion
 # when HOME is set to a profile chroot (e.g., ~/.hermes/profiles/indigo/home)
-_HERMES_ROOT = os.environ.get("HERMES_ROOT", "~/.hermes")
+_HERMES_ROOT = os.environ.get("HERMES_ROOT", os.path.expanduser("~/.hermes"))
 DEFAULT_SKILLS_DIR = os.path.join(_HERMES_ROOT, "profiles", "indigo", "skills")
 DEFAULT_PROFILE_SKILLS_DIR = os.path.join(_HERMES_ROOT, "skills")
 TARGET_SCORE = 50
