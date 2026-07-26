@@ -4,11 +4,7 @@ _Skills written to `<fs-root>/soul/skills/` are invisible to the agent unless al
 
 ## Problem
 
-<<<<<<< Updated upstream
-The SOUL repo (`<fs-root>/soul/` or `/indigokarasu/SOUL/`) has a `skills/` directory where new skills are authored. But the agent only scans `~/.hermes/profiles/indigo/skills/` for active skills. A skill that exists in `<fs-root>/soul/skills/<name>/` will never appear in `skills_list` or `skill_view` until it's copied to the active profile.
-=======
 The SOUL repo (`<fs-root>/soul/` or `/<agent-handle>/SOUL/`) has a `skills/` directory where new skills are authored. But the agent only scans `~/.hermes/profiles/indigo/skills/` for active skills. A skill that exists in `<fs-root>/soul/skills/<name>/` will never appear in `skills_list` or `skill_view` until it's copied to the active profile.
->>>>>>> Stashed changes
 
 This is distinct from the "orphan skills" pattern (skills in the active directory that are unused). This is an **install gap** — the skill is fully authored but never deployed.
 
@@ -45,8 +41,4 @@ When writing a new skill to the SOUL repo, ALWAYS also install it to the active 
 
 ## Real Case
 
-<<<<<<< Updated upstream
 `ocas-actualization` was written to `<fs-root>/soul/skills/ocas-actualization/` on June 14. It was never installed in the active profile. For 4 days, any attempt to invoke it returned "skill not found." It was only discovered when <operator> asked about it and I searched the SOUL repo directory directly.
-=======
-`ocas-actualization` was written to `<fs-root>/soul/skills/ocas-actualization/` on June 14. It was never installed in the active profile. For 4 days, any attempt to invoke it returned "skill not found." It was only discovered when <operator> asked about it and I searched the SOUL repo directory directly.
->>>>>>> Stashed changes
