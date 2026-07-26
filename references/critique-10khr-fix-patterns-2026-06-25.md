@@ -169,7 +169,6 @@ The checklist items should verify the constraints that the numbered steps enforc
 ## Runner Path Bug Fixed
 
 The `critique_10khr_runner.py` used `os.path.expanduser("~")` which resolves to the
-<<<<<<< Updated upstream
 profile chroot (`<hermes-home>/profiles/indigo/home`) in profile sessions. This caused
 all path constructions to produce nested non-existent paths like
 `<hermes-home>/profiles/indigo/home/.hermes/profiles/indigo/skills/`.
@@ -177,15 +176,6 @@ all path constructions to produce nested non-existent paths like
 **Fix:** Replace all `os.path.expanduser("~/.hermes/...")` with:
 ```python
 _HERMES_ROOT = os.environ.get("HERMES_ROOT", "<hermes-home>")
-=======
-profile chroot (`~/.hermes/profiles/indigo/home`) in profile sessions. This caused
-all path constructions to produce nested non-existent paths like
-`~/.hermes/profiles/indigo/home/.hermes/profiles/indigo/skills/`.
-
-**Fix:** Replace all `os.path.expanduser("~/.hermes/...")` with:
-```python
-_HERMES_ROOT = os.environ.get("HERMES_ROOT", "~/.hermes")
->>>>>>> Stashed changes
 DEFAULT_SKILLS_DIR = os.path.join(_HERMES_ROOT, "profiles", "indigo", "skills")
 DEFAULT_PROFILE_SKILLS_DIR = os.path.join(_HERMES_ROOT, "skills")
 STATE_FILE = os.path.join(_HERMES_ROOT, "skills", "ocas-critique", "commons", "data", "ocas-critique", "10khr-state.json")
