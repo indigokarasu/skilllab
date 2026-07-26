@@ -12,13 +12,8 @@ The `mcp_mempalace_mempalace_kg_add` tool rejects objects containing:
 **Symptom:** `{"success": false, "error": "object contains invalid characters"}` or `"object contains invalid path characters"`
 
 **Fix:** Sanitize the object string before calling kg_add. Strip or replace special characters:
-<<<<<<< Updated upstream
 - Email `<third-party-or-user-email>` → store in a drawer instead (kg_add rejects emails with `@`)
 - Paths `<hermes-home>/foo` → "root hermes foo" or store in drawer
-=======
-- Email `<third-party-or-user-email>` → store in a drawer instead (kg_add rejects emails with `@`)
-- Paths `~/.hermes/foo` → "root hermes foo" or store in drawer
->>>>>>> Stashed changes
 - Domains `example.com` → "example com"
 - Multi-word with commas "Los Angeles, CA" → "Los Angeles CA"
 
