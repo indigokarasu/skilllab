@@ -227,6 +227,76 @@ def check_module_scope_imports(script_dir):
     return offenders
 
 
+def _ref_resolves(skill_dir, ref):
+    """True if `ref` resolves anywhere a skill may legitimately point.
+
+    Skills cross-reference each other constantly. Resolving only against
+    skill_dir marks all of those dead — the false positive that makes a
+    dead-ref check worthless. Try, in order: the skill itself, the skills
+    root (handles "ocas-vibes/references/x.md" and "../other-skill/x.md"),
+    then the bare basename under any sibling skill's usual subdirs.
+    """
+    if os.path.exists(os.path.join(skill_dir, ref)):
+        return True
+    root = os.path.dirname(os.path.abspath(skill_dir.rstrip("/")))
+    if os.path.exists(os.path.normpath(os.path.join(root, ref))):
+        return True
+    if os.path.exists(os.path.normpath(os.path.join(skill_dir, ref))):
+        return True
+    # Shared helpers live in the AGENT ROOT's scripts/ dir, one level above
+    # skills/ — e.g. google_auth.py, which several skills document and use.
+    agent_root = os.path.dirname(root)
+    if agent_root and os.path.exists(os.path.normpath(os.path.join(agent_root, ref))):
+        return True
+    base = os.path.basename(ref)
+    try:
+        siblings = os.listdir(root)
+    except OSError:
+        return False
+    for sib in siblings:
+        p = os.path.join(root, sib)
+        if not os.path.isdir(p):
+            continue
+        for sub in ("", "references", "scripts", "assets", "templates"):
+            if os.path.exists(os.path.join(p, sub, base)):
+                return True
+    return False
+
+
+# Filename TEMPLATES are not missing files: `ingest_cron_YYYYMMDD.py` is a
+# naming convention, and flagging it produces nonsense edits.
+_PLACEHOLDER = re.compile(
+    r"YYYYMMDD|YYYY-MM-DD|<[^>]+>|\{[^}]+\}|\.\.\.|"
+    r"^(X|Y|Z|foo|bar|baz|example|template|your_\w+|my_\w+)\.(py|sh|md)$", re.I)
+
+
+def check_dead_references(skill_dir):
+    """Files SKILL.md points at that do not exist anywhere reachable.
+
+    A pointer to a doc that was never written is a promise the skill cannot
+    keep; an agent that follows it wastes a turn and loses trust in the rest
+    of the file.
+    """
+    sk = os.path.join(skill_dir, "SKILL.md")
+    try:
+        text = io.open(sk, encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return []
+    refs = set(re.findall(
+        r"(?:[A-Za-z0-9._\-]+/)*(?:references|scripts|assets|templates)/[A-Za-z0-9._\-/]+",
+        text))
+    dead = []
+    for r in refs:
+        base = os.path.basename(r)
+        if not re.search(r"\.[A-Za-z0-9]{1,5}$", base):
+            continue          # a directory mention, not a file
+        if _PLACEHOLDER.search(base):
+            continue
+        if not _ref_resolves(skill_dir, r):
+            dead.append(r)
+    return sorted(dead)
+
+
 def check_correctness(skill_dir):
     """D8: does the skill demonstrate it works, and is it safe to run?"""
     import glob, os
@@ -402,6 +472,15 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
     # D4 and D8 both scored progressive disclosure — 20% of the total on one
     # property, and nothing at all on whether the skill works or is safe.
     d8, correctness_findings = check_correctness(skill_dir)
+    # A SKILL.md promising docs that do not exist is a correctness defect:
+    # the agent following the pointer finds nothing. Cap the penalty so a
+    # doc problem cannot dominate the safety signal in this dimension.
+    _dead_refs = check_dead_references(skill_dir)
+    if _dead_refs:
+        d8 = max(0, d8 - min(2, len(_dead_refs)))
+        correctness_findings.append(
+            "dead reference%s (%d): %s" % ("" if len(_dead_refs) == 1 else "s",
+                                           len(_dead_refs), ", ".join(_dead_refs[:3])))
     scores["D8"] = d8
 
     # ── D9: Scripts quality (EXECUTED, not inferred) ──
