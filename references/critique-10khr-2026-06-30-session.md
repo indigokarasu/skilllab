@@ -18,7 +18,7 @@ Savings: 21 lines
 
 ### Fix 2: Remove duplicate section (D3)
 
-"NEVER MODIFY the operator INBOX" section (3 lines of prose) was a standalone section that duplicated:
+"NEVER MODIFY OPERATOR INBOX" section (3 lines of prose) was a standalone section that duplicated:
 - Safety rule #7 in the Safety Guardrails section (`<operator> inbox hard rule`)
 - A sentence embedded in Q1 of the Dual-Question Triage Framework
 

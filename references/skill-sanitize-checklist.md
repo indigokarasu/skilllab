@@ -64,7 +64,7 @@ Owner names, spouse names, contact names, and other personal identifiers must be
 >>>>>>> Stashed changes
 | Family/spouse names | " "Marcus" (in examples) | Replace with generic: "spouse", "colleague", "friend" |
 | Personal locations | "San Francisco, CA" as default | Replace with configurable or "last known" |
-| Personal email addresses | `the operator@email.com` | Replace with `{owner_email}` or remove |
+| Personal email addresses | `name@example.com` | Replace with `{owner_email}` or remove |
  numbers | `(415) ...` | Remove entirely |
 
 **Rule:** If a name or personal identifier appears in a *descriptive* or *instructional* context, replace it with a generic role or configurable variable. Names in audit logs referring to historical work on a skill are fine — they're documentation, not prescription.
