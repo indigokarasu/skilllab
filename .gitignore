@@ -1,1 +1,6 @@
 .git/
+
+# local identity denylist — MUST NEVER publish
+.pii-denylist
+__pycache__/
+*.pyc
