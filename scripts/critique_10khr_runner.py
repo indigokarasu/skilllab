@@ -27,7 +27,10 @@ Directory discovery:
 """
 
 import json
+import io
 import os
+import py_compile
+import re
 import sys
 import glob
 from datetime import datetime, timezone
@@ -133,6 +136,156 @@ def find_all_skills(skills_dir: str = None, all_profiles: bool = False) -> list:
     return results
 
 
+
+# ── Execution- and AST-based checks (2026-07-26) ──────────────────────────
+# This scorer used to read source text and infer behaviour. It cannot: a script
+# containing the string "--help" may still crash before argparse ever runs, and
+# a 478-line file can be 19k tokens. Observe instead of inferring.
+
+SCRIPT_TIMEOUT = 30
+EXECUTE_CHECKS = True          #: D8/D9 run the skill's scripts. Off for untrusted trees.
+
+# \W+ deliberately: matches shell form (reset --hard) AND subprocess list form
+# (["git", "reset", "--hard"]). A whitespace-only regex misses every list form,
+# which is how scripts actually invoke git.
+DESTRUCTIVE = [
+    (re.compile(r"reset\W+--hard"), "git reset --hard"),
+    (re.compile(r"clean\W+-[a-z]*f[a-z]*d\b"), "git clean -fd"),
+    (re.compile(r"\brm\W+-[a-z]*r[a-z]*f\b"), "rm -rf"),
+    (re.compile(r"\bDROP\W+TABLE\b", re.I), "DROP TABLE"),
+    (re.compile(r"shutil\.rmtree\("), "shutil.rmtree"),
+    (re.compile(r"push\W+--force(?!-with-lease)"), "git push --force"),
+]
+GUARD = re.compile(r"dry[_-]?run|confirm|are you sure|input\(|refus|abort|--force\b", re.I)
+
+STDLIB_OK = re.compile(
+    r"^(?:os|sys|re|io|json|argparse|subprocess|pathlib|datetime|time|glob|shutil|"
+    r"typing|collections|itertools|functools|math|random|hashlib|base64|csv|sqlite3|"
+    r"urllib|tempfile|textwrap|logging|unittest|py_compile|dataclasses|enum|uuid|ast|"
+    r"traceback|warnings|copy|string|struct|socket|threading|queue|signal|platform|"
+    r"curses|shlex|select|errno|stat|difflib|pprint|pickle|gzip|tarfile|zipfile|"
+    r"secrets|statistics|decimal|fractions|numbers|operator|bisect|heapq|array|"
+    r"configparser|getpass|inspect|importlib|contextlib|abc|__future__)$")
+
+
+def _run(cmd, cwd=None):
+    import subprocess
+    try:
+        p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
+                           timeout=SCRIPT_TIMEOUT)
+        return p.returncode, (p.stdout or "") + (p.stderr or "")
+    except Exception as e:
+        return 1, str(e)
+
+
+def check_scripts_help(script_dir, execute=True):
+    """Do the scripts ACTUALLY answer --help? Returns (ok, broken, total)."""
+    import os
+    if not os.path.isdir(script_dir):
+        return [], [], 0
+    scripts = sorted(f for f in os.listdir(script_dir) if f.endswith((".py", ".sh")))
+    ok, broken = [], []
+    for name in scripts:
+        path = os.path.join(script_dir, name)
+        if execute:
+            cmd = ["bash", path, "--help"] if name.endswith(".sh") else [sys.executable, path, "--help"]
+            rc, _ = _run(cmd, cwd=script_dir)
+            ok.append(name) if rc == 0 else broken.append("%s (rc=%d)" % (name, rc))
+        else:
+            try:
+                src = io.open(path, encoding="utf-8", errors="ignore").read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            ok.append(name) if "--help" in src else broken.append(name)
+    return ok, broken, len(scripts)
+
+
+def check_module_scope_imports(script_dir):
+    """Third-party imports at module scope break --help wherever they're absent.
+
+    Executing --help only proves it works in THIS interpreter. A module-scope
+    optional import exits before argparse on any machine lacking it — the exact
+    failure an all-deps environment cannot reveal.
+    """
+    import ast, glob, os
+    offenders = []
+    for sp in sorted(glob.glob(os.path.join(script_dir, "*.py"))):
+        try:
+            tree = ast.parse(io.open(sp, encoding="utf-8", errors="ignore").read())
+        except (OSError, UnicodeDecodeError, SyntaxError):
+            continue
+        for node in tree.body:                       # module scope only
+            mods = []
+            if isinstance(node, ast.Import):
+                mods = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                mods = [node.module]
+            hit = next((m for m in mods if not STDLIB_OK.match(m.split(".")[0])), None)
+            if hit:
+                offenders.append("%s: %s" % (os.path.basename(sp), hit.split(".")[0]))
+                break
+    return offenders
+
+
+def check_correctness(skill_dir):
+    """D8: does the skill demonstrate it works, and is it safe to run?"""
+    import glob, os
+    findings, score = [], 5
+
+    tdir = os.path.join(skill_dir, "tests")
+    if not (os.path.isdir(tdir) and glob.glob(os.path.join(tdir, "test_*.py"))):
+        score -= 2; findings.append("no tests")
+    else:
+        rc, out = _run([sys.executable, "-m", "unittest", "discover", "-s", "tests"], cwd=skill_dir)
+        if rc != 0:
+            score -= 2
+            findings.append("tests FAIL: " + (out.strip().splitlines() or ["?"])[-1][:60])
+
+    if not glob.glob(os.path.join(skill_dir, ".github", "workflows", "*.y*ml")):
+        score -= 1; findings.append("no CI workflow")
+
+    # Report EVERY unguarded destructive call, sorted (glob order is arbitrary).
+    hits = []
+    for sp in sorted(glob.glob(os.path.join(skill_dir, "scripts", "*"))):
+        if not sp.endswith((".py", ".sh")):
+            continue
+        try:
+            raw = io.open(sp, encoding="utf-8", errors="ignore").read()
+        except (OSError, UnicodeDecodeError):
+            continue
+        code = "\n".join(l for l in raw.splitlines() if not l.lstrip().startswith("#"))
+        if GUARD.search(code):
+            continue
+        # `rm -rf "$VAR"` on a mktemp dir under `set -u` is the standard safe
+        # cleanup idiom; flagging it teaches people to ignore this check.
+        safe_tmp = "mktemp" in code and re.search(r"set\s+-[a-z]*u", code)
+        for rx, lbl in DESTRUCTIVE:
+            if rx.search(code) and not (lbl == "rm -rf" and safe_tmp):
+                hits.append("%s in %s" % (lbl, os.path.basename(sp)))
+    if hits:
+        score -= 2; findings.append("unguarded " + "; ".join(sorted(set(hits))))
+
+    for sp in sorted(glob.glob(os.path.join(skill_dir, "scripts", "*.py"))):
+        try:
+            py_compile.compile(sp, doraise=True)
+        except Exception:
+            score -= 1; findings.append("%s does not compile" % os.path.basename(sp)); break
+
+    imp = check_module_scope_imports(os.path.join(skill_dir, "scripts"))
+    if imp:
+        score -= 1
+        findings.append("module-scope 3rd-party import (breaks --help without deps): "
+                        + ", ".join(imp[:3]))
+
+    gate = os.path.join(skill_dir, "scripts", "check_no_pii.py")
+    if os.path.exists(gate):
+        rc, _ = _run([sys.executable, gate, "--quiet"], cwd=skill_dir)
+        if rc != 0:
+            score -= 1; findings.append("PII gate FAILS")
+
+    return max(1, score), findings
+
+
 def score_skill(skill_name: str, skill_path: str) -> dict:
     """
     Score a skill by reading its SKILL.md and evaluating the 10 rubric dimensions.
@@ -197,7 +350,12 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
         d3 = 3
     else:
         d3 = 2
-    if total_lines > 450:
+    # Tokens govern context cost; line count is a proxy that long lines defeat
+    # (478 lines / ~19k tokens once scored 5/5 here).
+    approx_tokens = len(content) / 4
+    if approx_tokens > 5000:
+        d3 = max(1, d3 - 2)
+    elif approx_tokens > 3500:
         d3 = max(1, d3 - 1)
     scores["D3"] = d3
 
@@ -207,8 +365,10 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
         d4 += 1
     if "when to read" in content.lower():
         d4 += 1
-    if total_lines < 400:
+    if len(content) / 4 < 5000:
         d4 = min(5, d4 + 1)
+    else:
+        d4 = max(1, d4 - 1)          # over the token budget IS a structure failure
     scores["D4"] = min(5, d4)
 
     # ── D5: Instruction clarity ──
@@ -238,47 +398,21 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
         d7 += 1
     scores["D7"] = min(5, d7)
 
-    # ── D8: Progressive disclosure ──
-    d8 = 3
-    ref_dir = os.path.join(skill_dir, "references")
-    if os.path.isdir(ref_dir):
-        ref_files = [f for f in os.listdir(ref_dir) if f.endswith(".md")]
-        if len(ref_files) >= 3:
-            d8 += 1
-        if "when to read" in content.lower():
-            d8 += 1
-    scores["D8"] = min(5, d8)
+    # ── D8: Correctness & Safety (was a second copy of D4) ──
+    # D4 and D8 both scored progressive disclosure — 20% of the total on one
+    # property, and nothing at all on whether the skill works or is safe.
+    d8, correctness_findings = check_correctness(skill_dir)
+    scores["D8"] = d8
 
-    # ── D9: Scripts quality ──
+    # ── D9: Scripts quality (EXECUTED, not inferred) ──
     script_dir = os.path.join(skill_dir, "scripts")
-    if os.path.isdir(script_dir):
-        scripts = [f for f in os.listdir(script_dir) if f.endswith((".py", ".sh"))]
-        if scripts:
-            # Scan ALL scripts (not just the first 3) for --help/usage/argparse.
-            # Sampling only the first 3 hides real gaps when most scripts lack --help
-            # (e.g. a 19-script skill with 7 missing --help still scored D9=5 because
-            # the first 3 happened to have it). Confirmed gap 2026-07-14.
-            missing_help = []
-            for s in scripts:
-                sp = os.path.join(script_dir, s)
-                try:
-                    with open(sp) as sf:
-                        sc = sf.read()
-                except Exception:
-                    continue
-                if "--help" not in sc and "usage" not in sc.lower() and "argparse" not in sc:
-                    missing_help.append(s)
-            if not missing_help:
-                d9 = 5
-            elif len(missing_help) < len(scripts) / 2:
-                d9 = 4
-            else:
-                d9 = 3
-            scores["D9"] = d9
-        else:
-            scores["D9"] = 4
+    _ok, broken_help, _n = check_scripts_help(script_dir, execute=EXECUTE_CHECKS)
+    if _n == 0 or not broken_help:
+        scores["D9"] = 5
+    elif len(broken_help) < _n / 2:
+        scores["D9"] = 3
     else:
-        scores["D9"] = 5  # N/A — no scripts needed
+        scores["D9"] = 1
 
     # ── D10: Completeness ──
     d10 = 3
@@ -295,6 +429,9 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
         "total": total_score,
         "dimensions": scores,
         "line_count": total_lines,
+        "approx_tokens": int(len(content) / 4),
+        "scripts_failing_help": broken_help,
+        "correctness_findings": correctness_findings,
         "code_ratio": round(ratio, 1),
         "scored_at": datetime.now(timezone.utc).isoformat(),
     }
