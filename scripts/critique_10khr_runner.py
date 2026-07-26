@@ -227,6 +227,113 @@ def check_module_scope_imports(script_dir):
     return offenders
 
 
+def _ref_resolves(skill_dir, ref):
+    """True if `ref` resolves anywhere a skill may legitimately point.
+
+    Skills cross-reference each other constantly. Resolving only against
+    skill_dir marks all of those dead — the false positive that makes a
+    dead-ref check worthless. Try, in order: the skill itself, the skills
+    root (handles "ocas-vibes/references/x.md" and "../other-skill/x.md"),
+    then the bare basename under any sibling skill's usual subdirs.
+    """
+    if os.path.exists(os.path.join(skill_dir, ref)):
+        return True
+    root = os.path.dirname(os.path.abspath(skill_dir.rstrip("/")))
+    if os.path.exists(os.path.normpath(os.path.join(root, ref))):
+        return True
+    if os.path.exists(os.path.normpath(os.path.join(skill_dir, ref))):
+        return True
+    # Shared helpers live in the AGENT ROOT's scripts/ dir, one level above
+    # skills/ — e.g. google_auth.py, which several skills document and use.
+    agent_root = os.path.dirname(root)
+    if agent_root and os.path.exists(os.path.normpath(os.path.join(agent_root, ref))):
+        return True
+    base = os.path.basename(ref)
+    try:
+        siblings = os.listdir(root)
+    except OSError:
+        return False
+    for sib in siblings:
+        p = os.path.join(root, sib)
+        if not os.path.isdir(p):
+            continue
+        for sub in ("", "references", "scripts", "assets", "templates"):
+            if os.path.exists(os.path.join(p, sub, base)):
+                return True
+    return False
+
+
+# Filename TEMPLATES are not missing files: `ingest_cron_YYYYMMDD.py` is a
+# naming convention, and flagging it produces nonsense edits.
+_PLACEHOLDER = re.compile(
+    r"YYYYMMDD|YYYY-MM-DD|<[^>]+>|\{[^}]+\}|\.\.\.|"
+    r"^(X|Y|Z|foo|bar|baz|example|template|your_\w+|my_\w+)\.(py|sh|md)$", re.I)
+
+
+def check_dead_references(skill_dir):
+    """Files SKILL.md points at that do not exist anywhere reachable.
+
+    A pointer to a doc that was never written is a promise the skill cannot
+    keep; an agent that follows it wastes a turn and loses trust in the rest
+    of the file.
+    """
+    sk = os.path.join(skill_dir, "SKILL.md")
+    try:
+        text = io.open(sk, encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return []
+    refs = set(re.findall(
+        r"(?:[A-Za-z0-9._\-]+/)*(?:references|scripts|assets|templates)/[A-Za-z0-9._\-/]+",
+        text))
+    dead = []
+    for r in refs:
+        base = os.path.basename(r)
+        if not re.search(r"\.[A-Za-z0-9]{1,5}$", base):
+            continue          # a directory mention, not a file
+        if _PLACEHOLDER.search(base):
+            continue
+        if not _ref_resolves(skill_dir, r):
+            dead.append(r)
+    return sorted(dead)
+
+
+def check_frontmatter_parses(skill_dir):
+    """Frontmatter must PARSE, not merely contain the right field names.
+
+    The previous check was a regex for `name:`, which matches even when
+    unresolved merge-conflict markers sit between the --- fences. Twelve
+    public skills shipped that way: every field was "present", the YAML was
+    invalid, and the skill would not load for anyone who installed it.
+    """
+    problems = []
+    sk = os.path.join(skill_dir, "SKILL.md")
+    try:
+        text = io.open(sk, encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return ["SKILL.md unreadable"]
+
+    if re.search(r"^(<{7} |={7}$|>{7} )", text, re.M):
+        problems.append("unresolved merge-conflict markers in SKILL.md")
+
+    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    if not m:
+        problems.append("no YAML frontmatter block")
+        return problems
+    try:
+        import yaml
+        meta = yaml.safe_load(m.group(1))
+    except Exception as e:
+        problems.append("frontmatter does not parse: %s" % type(e).__name__)
+        return problems
+    if not isinstance(meta, dict):
+        problems.append("frontmatter is not a mapping")
+        return problems
+    for field in ("name", "description"):
+        if not meta.get(field):
+            problems.append("frontmatter missing '%s'" % field)
+    return problems
+
+
 def check_correctness(skill_dir):
     """D8: does the skill demonstrate it works, and is it safe to run?"""
     import glob, os
@@ -402,6 +509,21 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
     # D4 and D8 both scored progressive disclosure — 20% of the total on one
     # property, and nothing at all on whether the skill works or is safe.
     d8, correctness_findings = check_correctness(skill_dir)
+    # A SKILL.md promising docs that do not exist is a correctness defect:
+    # the agent following the pointer finds nothing. Cap the penalty so a
+    # doc problem cannot dominate the safety signal in this dimension.
+    # Invalid frontmatter means the skill does not load at all -- a harder
+    # failure than anything else measured here, so it is not a soft deduction.
+    _fm = check_frontmatter_parses(skill_dir)
+    if _fm:
+        d8 = max(0, d8 - 2)
+        correctness_findings.extend(_fm)
+    _dead_refs = check_dead_references(skill_dir)
+    if _dead_refs:
+        d8 = max(0, d8 - min(2, len(_dead_refs)))
+        correctness_findings.append(
+            "dead reference%s (%d): %s" % ("" if len(_dead_refs) == 1 else "s",
+                                           len(_dead_refs), ", ".join(_dead_refs[:3])))
     scores["D8"] = d8
 
     # ── D9: Scripts quality (EXECUTED, not inferred) ──
