@@ -31,7 +31,14 @@ echo "=== Secret scan: $TARGET ==="
 # A scanner that cries wolf on its own test corpus gets routed around, which is
 # the failure mode this scanner exists to prevent.
 if git -C "$TARGET" rev-parse --git-dir >/dev/null 2>&1; then
-  wt=$(git -C "$TARGET" grep -I -n -P "$RE" -- . ':(exclude)scripts/secret-scan.sh' 2>/dev/null \
+  # Exclude the scanners themselves at ANY depth and under EITHER spelling.
+  # The pattern file necessarily contains secret-shaped strings, so a scanner
+  # that does not exclude itself reports its own regex as a leak -- which is
+  # exactly what blocked both monorepos when this moved to `git grep` and the
+  # old --exclude=secret_scan.sh (underscore) was not carried across.
+  wt=$(git -C "$TARGET" grep -I -n -P "$RE" -- . \
+         ':(exclude,glob)**/secret-scan.sh' ':(exclude,glob)**/secret_scan.sh' \
+         ':(exclude)secret-scan.sh' ':(exclude)secret_scan.sh' 2>/dev/null \
        | grep -vE 'secret-allow|sanitize-allow|pii-allow' | mask)
 else
   wt=$(grep -rInP --exclude-dir=.git --exclude=secret-scan.sh --exclude='secret_scan.sh' "$RE" "$TARGET" 2>/dev/null \
