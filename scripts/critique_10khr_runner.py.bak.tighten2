@@ -184,18 +184,14 @@ def _run(cmd, cwd=None):
 # POST_TEXT="$1", so `bash post.sh --help` published "--help" to Bluesky three
 # times during an audit. Never execute these; inspect them instead.
 _OUTBOUND = re.compile(r"""
-    # WRITE operations only. A login (com.atproto.server.createSession) and a
-    # timeline read (app.bsky.notification.list) are xrpc POSTs too, so matching
-    # those made read-only scanners look dangerous. A scorer that cries wolf gets
-    # ignored, which is how the real hazard slips through.
-    createRecord | putRecord | deleteRecord | applyWrites
-  | \\bpost\\.sh\\b
-  | smtplib | sendmail | \\bsend_email\\b
-  | api\\.telegram\\.org/bot[^/\\s]*/send
-  | hooks\\.slack | discord\\.com/api/webhooks
-  | submit_order | place_order
-  | gh\\s+(pr|issue|release)\\s+create | git\\s+push
-  | tweepy | \\bmastodon\\b
+    createRecord | app\.bsky\.feed | com\.atproto | /xrpc/
+  | curl\s+(-[A-Za-z]+\s+)*-X\s*["']?(POST|PUT|PATCH|DELETE)
+  | requests\.(post|put|patch|delete) | httpx\.(post|put|patch|delete)
+  | smtplib | sendmail | send_message | send_email
+  | api\.telegram\.org | hooks\.slack | discord\.com/api
+  | \bpost\.sh\b | submit_order | alpaca | place_order
+  | gh\s+(pr|issue|release)\s+create | git\s+push
+  | tweepy | mastodon | atproto
 """, re.X | re.I)
 
 # a shell script that assigns a positional straight into a variable it then sends
