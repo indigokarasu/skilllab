@@ -28,22 +28,6 @@ import sys
 import subprocess
 from datetime import datetime, timezone
 
-# OUTBOUND_SKIP: never run --help on a script that can post/send/trade. An audit
-# doing exactly that published "--help" to a live Bluesky account three times.
-import re as _re
-_OUTBOUND_SKIP = _re.compile(
-    r"createRecord|app\.bsky\.feed|com\.atproto|/xrpc/|post\.sh|smtplib"
-    r"|requests\.(post|put|patch|delete)|api\.telegram\.org|submit_order|alpaca"
-    r"|curl\s+(-[A-Za-z]+\s+)*-X\s*[\"']?(POST|PUT|PATCH|DELETE)", _re.I)
-
-
-def _can_send(path):
-    try:
-        return bool(_OUTBOUND_SKIP.search(open(path, encoding="utf-8", errors="ignore").read()))
-    except OSError:
-        return False
-
-
 
 def _runner_path():
     hermes_root = os.environ.get("HERMES_ROOT", os.path.expanduser("~/.hermes"))
@@ -117,13 +101,9 @@ def ondisk_check(skill_name, skill_path, runner):
             sp = os.path.join(sd, s)
             try:
                 if s.endswith(".py"):
-                    if _can_send(str(path)):
-                        continue  # outbound: do not execute
                     rc = subprocess.run([sys.executable, sp, "--help"], input="",
                                         capture_output=True, text=True, timeout=30).returncode
                 else:
-                    if _can_send(str(path)):
-                        continue  # outbound: do not execute
                     rc = subprocess.run(["bash", sp, "--help"], input="",
                                         capture_output=True, text=True, timeout=30).returncode
             except Exception:

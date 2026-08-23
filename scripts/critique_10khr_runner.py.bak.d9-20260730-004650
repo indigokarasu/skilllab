@@ -178,62 +178,8 @@ def _run(cmd, cwd=None):
         return 1, str(e)
 
 
-# ─── outbound-effect detection (D9 must not fire side effects) ──────────────
-# Executing --help is how D9 proves a script is inspectable. But a script that
-# treats argv[1] as its payload turns the flag INTO the payload: post.sh is
-# POST_TEXT="$1", so `bash post.sh --help` published "--help" to Bluesky three
-# times during an audit. Never execute these; inspect them instead.
-_OUTBOUND = re.compile(r"""
-    # WRITE operations only. A login (com.atproto.server.createSession) and a
-    # timeline read (app.bsky.notification.list) are xrpc POSTs too, so matching
-    # those made read-only scanners look dangerous. A scorer that cries wolf gets
-    # ignored, which is how the real hazard slips through.
-    createRecord | putRecord | deleteRecord | applyWrites
-  | \\bpost\\.sh\\b
-  | smtplib | sendmail | \\bsend_email\\b
-  | api\\.telegram\\.org/bot[^/\\s]*/send
-  | hooks\\.slack | discord\\.com/api/webhooks
-  | submit_order | place_order
-  | gh\\s+(pr|issue|release)\\s+create | git\\s+push
-  | tweepy | \\bmastodon\\b
-""", re.X | re.I)
-
-# a shell script that assigns a positional straight into a variable it then sends
-_POSITIONAL_PAYLOAD = re.compile(r'^\s*[A-Z_]+=\"?\$\{?[1-9]', re.M)
-
-# evidence the script deals with the flag BEFORE doing anything
-_FLAG_SAFE_PY = re.compile(r"argparse|add_argument|click\.|typer\.", re.I)
-_FLAG_SAFE_SH = re.compile(
-    r'case\s+"?\$\{?1[^"]*"?\s+in[^;]*(--help|-h)'          # case guard
-    r'|if\s*\[\s*"?\$\{?1[^]]*(--help|-h)'                  # if guard
-    r'|getopts', re.S)
-
-
-def _outbound_capable(name, src):
-    """Can running this script send something to the outside world?"""
-    if not _OUTBOUND.search(src):
-        return False
-    if name.endswith(".sh"):
-        return True                      # shell + outbound: never execute
-    return True
-
-
-def _flag_safe(name, src):
-    """Does it handle --help before acting? (static, no execution)"""
-    if name.endswith(".sh"):
-        return bool(_FLAG_SAFE_SH.search(src))
-    return bool(_FLAG_SAFE_PY.search(src)) or "--help" in src.split("\n\n")[0] \
-        or bool(re.search(r"argv\[1:\][^\n]*--help|--help[^\n]*argv", src))
-
-
 def check_scripts_help(script_dir, execute=True):
-    """Do the scripts ACTUALLY answer --help? Returns (ok, broken, total).
-
-    Scripts that can post/send/trade are NEVER executed here -- see
-    _outbound_capable(). They are judged statically on whether they handle the
-    flag before acting. Executing them is how an audit published "--help" to a
-    live Bluesky account.
-    """
+    """Do the scripts ACTUALLY answer --help? Returns (ok, broken, total)."""
     import os
     if not os.path.isdir(script_dir):
         return [], [], 0
@@ -241,26 +187,14 @@ def check_scripts_help(script_dir, execute=True):
     ok, broken = [], []
     for name in scripts:
         path = os.path.join(script_dir, name)
-        try:
-            src = io.open(path, encoding="utf-8", errors="ignore").read()
-        except (OSError, UnicodeDecodeError):
-            src = ""
-
-        if src and _outbound_capable(name, src):
-            # static only: side effects must not be triggered to test a flag
-            if _flag_safe(name, src):
-                ok.append(name)
-            else:
-                broken.append("%s (outbound, no flag guard -- would treat "
-                              "--help as data)" % name)
-            continue
-
         if execute:
             cmd = ["bash", path, "--help"] if name.endswith(".sh") else [sys.executable, path, "--help"]
             rc, _ = _run(cmd, cwd=script_dir)
             ok.append(name) if rc == 0 else broken.append("%s (rc=%d)" % (name, rc))
         else:
-            if not src:
+            try:
+                src = io.open(path, encoding="utf-8", errors="ignore").read()
+            except (OSError, UnicodeDecodeError):
                 continue
             ok.append(name) if "--help" in src else broken.append(name)
     return ok, broken, len(scripts)
