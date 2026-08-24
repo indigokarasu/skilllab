@@ -37,7 +37,7 @@ The critique procedure (Phases 1-6) worked well:
 
 ## Profile vs Monorepo Sync Gap
 
-The profile copy (`~/.hermes/profiles/indigo/skills/util-wiki/`) had fixes applied but the monorepo (`~/utilities/wiki/`) did not. Both must be kept in sync. The `source:` field in frontmatter points to the monorepo, so that's the canonical version.
+The profile copy (`$HERMES_HOME/../indigo/skills/util-wiki/`) had fixes applied but the monorepo (`~/utilities/wiki/`) did not. Both must be kept in sync. The `source:` field in frontmatter points to the monorepo, so that's the canonical version.
 
 **Action:** After any skill edit, verify `diff` between profile and monorepo copies before considering the session complete.
 

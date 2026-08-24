@@ -32,7 +32,7 @@ conditional **When to read** column so the agent loads only what each operation 
 | `references/nous-skill-requirements.md` | During D1 audit — official Hermes skill system requirements from Nous Research docs |
 | `references/critique-agentskill-scanner-guide.md` | After manual review — scanner false positives |
 | `references/design-library.md` | When building any UI — design reference library (glitch aesthetic, DESIGN.md spec, 72 brand systems, 67 styles, 200 iOS apps, taste-skill anti-slop enforcement), usage guide, refresh commands |
-| `~/.hermes/profiles/indigo/skills/responsive-design/references/` | Responsive CSS — container queries, fluid typography, Grid/Flexbox, breakpoints, responsive nav/images/tables (wshobson) |
+| `$HERMES_HOME/../indigo/skills/responsive-design/references/` | Responsive CSS — container queries, fluid typography, Grid/Flexbox, breakpoints, responsive nav/images/tables (wshobson) |
 | `references/critique-10khr-learnings.md` | During 10khr — accumulated grinding patterns |
 | `references/critique-10khr-may-2026-batch.md` | During batch critique — scoring insights, fix frequency table |
 | `references/critique-10khr-may-2026-learnings.md` | After May 2026 batch — reusable fix patterns |
@@ -61,3 +61,12 @@ conditional **When to read** column so the agent loads only what each operation 
 | `references/critique-10khr-2026-06-29-koda-session.md` | June 29 KODA grinding session — 7/26 at 50/50, imported community skill rewrite pattern, gh+curl dedup, cross-profile pitfall |
 | `scripts/critique_code_ratio.py` | During Phase 2 — code ratio measurement |
 | `scripts/critique_10khr_runner.py` | During 10khr — heuristic scoring and targeting (over-scores by 6-10pt) |
+
+## Added 2026-08-24 (ocas-skilllab grind)
+
+| `references/critique-10khr-grind-pitfalls.md` | Full dated narratives behind the distilled 10khr-mode rules | When a grind misbehaves: wrong target, score disagreement, state-file drift, or a D3/D5/D8/D9 heuristic anomaly |
+| `references/cron-grind-resilience.md` | Cron-environment grind properties (degraded reads, execute_code block, write_file chroot) | During any autonomous/cron grind before relying on agentic read/write tools |
+| `references/merge-parallel-copy-dedupe.md` | 7-step symlink-consolidation procedure for skill families duplicated across trees/profiles | Before any cross-tree dedupe; never delete until Step-3 superset check is 0 |
+| `references/skill-publish-github-mechanics.md` | Dated GitHub playbooks: new monorepo creation, existing-remote reconciliation, bulk rename, eng-skills namespace | When doing those four repo operations |
+| `references/secret-history-rewrite.md` | Secret remediation playbook incl. git filter-branch history rewrite + rotation | When secret-scan.sh exits 1 and a real secret needs scrubbing |
+| `references/rename-cache-updates.md` | Exact cache-key rewrite snippets for renames | During a skill rename |

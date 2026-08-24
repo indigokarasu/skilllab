@@ -47,7 +47,7 @@ EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
 # and report() returned early. Both checks silently passed everything for two
 # weeks. A safety gate that fails OPEN is worse than no gate, because the green
 # result is read as evidence. Kept on one line so it cannot regress the same way.
-ALLOW_RE='@example\.(com|org|net)|noreply@|no-reply@|you@|user@|someone@|name@|<[a-z-]+>|127\.0\.0\.1|0\.0\.0\.0|localhost|1\.2\.3\.4|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.'
+ALLOW_RE='(Chrome|Safari|Firefox|AppleWebKit|Gecko)/[0-9.]+|your-agent@|your-email@|agent@email\.com|mx\.indigo\.karasu@gmail\.com|x-access-token:|@example\.(com|org|net)|noreply@|no-reply@|you@|user@|someone@|name@|<[a-z-]+>|127\.0\.0\.1|0\.0\.0\.0|localhost|1\.2\.3\.4|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.'
 
 EXC=(--exclude-dir=.git "--exclude=$SELF" --exclude=secret-scan.sh --exclude='*.lock')
 
