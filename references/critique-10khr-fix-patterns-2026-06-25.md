@@ -178,9 +178,9 @@ all path constructions to produce nested non-existent paths like
 ```python
 _HERMES_ROOT = os.environ.get("HERMES_ROOT", "<hermes-home>")
 =======
-profile chroot (`~/.hermes/profiles/indigo/home`) in profile sessions. This caused
+profile chroot (`$HERMES_HOME/../indigo/home`) in profile sessions. This caused
 all path constructions to produce nested non-existent paths like
-`~/.hermes/profiles/indigo/home/.hermes/profiles/indigo/skills/`.
+`$HERMES_HOME/../indigo/home/.hermes/profiles/indigo/skills/`.
 
 **Fix:** Replace all `os.path.expanduser("~/.hermes/...")` with:
 ```python

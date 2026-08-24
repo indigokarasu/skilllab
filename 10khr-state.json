@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-08-22T18:12:27.379256+00:00",
-  "last_target": "ocas-sift",
+  "last_run": "2026-08-24T05:53:09.166122+00:00",
+  "last_target": "ocas-skilllab",
   "last_score_before": 39,
   "last_score_after": 50,
   "skills_improved_this_session": [
@@ -174,8 +174,35 @@
       "grounded": "manual+on-disk+executed-verified",
       "at": "2026-08-22T18:12:27.379233+00:00",
       "note": "Skip condition NOT met: SKILL.md mtime 2026-08-22 > last_run 2026-08-05, genuine grind required. Local changes uncommitted in the skill repo (update.sh guard correctly refuses auto-pull while dirty)."
+    },
+    {
+      "skill": "ocas-bower",
+      "date": "2026-08-23T05:58:02.114072+00:00",
+      "heuristic_before": 40,
+      "manual_before": "D9=4 (bower_analyze.py ran on --help), D4=4 (map missing 5 refs incl. phantom spec-ocas-recovery.md)",
+      "fixes": [
+        "scripts/bower_analyze.py: added top-level --help/-h guard before side effects; verified --help exits 0 printing docstring",
+        "Copied shared spec-ocas-recovery.md into references/ (was a phantom reference from ocas-custodian's copy)",
+        "Support File Map: added When-to-read rows for interactive-menu.md, cron-drive-fallback.md, mcp-drive-tooling.md, spec-ocas-recovery.md, okrs.md"
+      ],
+      "manual_after": "50/50 \u2014 all 10 dims 5/5; on-disk verify: yaml OK, category present, 319 lines, code ratio 0%, 'when to read' present, 4 checkboxes, all 7 scripts --help exit 0",
+      "wc_lines": 319
+    },
+    {
+      "skill": "ocas-custodian",
+      "date": "2026-08-24T05:53:09.164872+00:00",
+      "fixes": "extracted regrown inline Support File Map (89 rows) -> references/support-file-map.md with 'When to read' pointer (522->402 lines); consolidated 3 redundant skill-update-wrapper bullets into references/skill-update-rebase-conflict-batch-pattern.md; created missing wrong-path-prefix ref; deleted dangling bare-script-path-mismatch pointer; fixed verify_fixes_cron_run.py --help exit 2->0",
+      "before": "heuristic 40/50, 523 lines, 4 phantom refs, 1 script --help exit 2",
+      "after": "manual 50/50 (all dims 5/5); on-disk: 402 lines, 0 phantom refs, all scripts --help exit 0; residual heuristic D3/D4 = token-budget proxy (>5000 approx_tokens), proxy-yields case"
+    },
+    {
+      "skill": "ocas-skilllab",
+      "date": "2026-08-24T17:57:28.996647+00:00",
+      "fix": "D3/D4 grind: 542->449 lines; extracted pitfall narratives, cron-resilience paragraphs, parallel-copy dedupe steps, dated GitHub-mechanics bullets, secret remediation, rename snippets to 6 new references with When-to-read pointers; D9 verified manually (all 7 scripts --help exit 0; runner double-path false negative)",
+      "before": "40/50 heuristic (manual D3=3,D4=3)",
+      "after": "50/50 manual rubric"
     }
   ],
-  "skills_improved": 17,
+  "skills_improved": 20,
   "current_target": null
 }

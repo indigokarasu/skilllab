@@ -55,13 +55,13 @@ mirror as its own sub-project, not a one-liner. Steps:
    `name:` is the ONLY field that differs from the repo copy.
 2. **Pre-flight collision scan BEFORE mirroring.** Existing local `eng-*` skills may
    collide with mirror names. Enumerate them first:
-   `search_files` `eng-*` under `~/.hermes/profiles/indigo/skills`, and check what
+   `search_files` `eng-*` under `$HERMES_HOME/../indigo/skills`, and check what
    references them (`grep -rln "<eng-name>" --include=SKILL.md` across skills,
    EXCLUDING the skill's own dir). Three collision shapes:
    - **Self-referential only** (nothing external names it) -> safe to overwrite/rename.
    - **Referenced by another live skill** -> you MUST update those references too
      (and grep again to confirm zero dangling bare-name refs outside the eng cluster).
-   - **A symlink** (e.g. `eng-code-standards -> ~/.hermes/profiles/koda/...`)
+   - **A symlink** (e.g. `eng-code-standards -> $HERMES_HOME/../koda/...`)
      -> do NOT `shutil.rmtree` it (rmtree refuses symlinks with `Cannot call rmtree
      on a symbolic link`). Remove with `os.unlink` / `rm`; the symlink target is
      untouched. Then write the real mirrored copy in its place.
