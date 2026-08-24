@@ -2,9 +2,9 @@
 
 ## Problem
 Skills may live at any depth under any profile directory:
-- `~/.hermes/profiles/indigo/skills/ocas-foo/SKILL.md`
-- `~/.hermes/profiles/indigo/skills/infrastructure/util-bar/SKILL.md`
-- `~/.hermes/profiles/koda/skills/software-development/ocas-baz/SKILL.md`
+- `$HERMES_HOME/../indigo/skills/ocas-foo/SKILL.md`
+- `$HERMES_HOME/../indigo/skills/infrastructure/util-bar/SKILL.md`
+- `$HERMES_HOME/../koda/skills/software-development/ocas-baz/SKILL.md`
 - `~/.hermes/skills/util-github/SKILL.md` (default profile)
 
 Hardcoding a single directory (e.g., `~/.hermes/skills/`) misses all skills in the active profile and subdirectories.

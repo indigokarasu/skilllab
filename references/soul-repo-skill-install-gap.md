@@ -5,9 +5,9 @@ _Skills written to `<fs-root>/soul/skills/` are invisible to the agent unless al
 ## Problem
 
 <<<<<<< Updated upstream
-The SOUL repo (`<fs-root>/soul/` or `/indigokarasu/SOUL/`) has a `skills/` directory where new skills are authored. But the agent only scans `~/.hermes/profiles/indigo/skills/` for active skills. A skill that exists in `<fs-root>/soul/skills/<name>/` will never appear in `skills_list` or `skill_view` until it's copied to the active profile.
+The SOUL repo (`<fs-root>/soul/` or `/indigokarasu/SOUL/`) has a `skills/` directory where new skills are authored. But the agent only scans `$HERMES_HOME/../indigo/skills/` for active skills. A skill that exists in `<fs-root>/soul/skills/<name>/` will never appear in `skills_list` or `skill_view` until it's copied to the active profile.
 =======
-The SOUL repo (`<fs-root>/soul/` or `/<agent-handle>/SOUL/`) has a `skills/` directory where new skills are authored. But the agent only scans `~/.hermes/profiles/indigo/skills/` for active skills. A skill that exists in `<fs-root>/soul/skills/<name>/` will never appear in `skills_list` or `skill_view` until it's copied to the active profile.
+The SOUL repo (`<fs-root>/soul/` or `/<agent-handle>/SOUL/`) has a `skills/` directory where new skills are authored. But the agent only scans `$HERMES_HOME/../indigo/skills/` for active skills. A skill that exists in `<fs-root>/soul/skills/<name>/` will never appear in `skills_list` or `skill_view` until it's copied to the active profile.
 >>>>>>> Stashed changes
 
 This is distinct from the "orphan skills" pattern (skills in the active directory that are unused). This is an **install gap** — the skill is fully authored but never deployed.
@@ -15,7 +15,7 @@ This is distinct from the "orphan skills" pattern (skills in the active director
 ## How It Manifests
 
 - User says "run X skill" → agent says "skill not found" → user says "but we wrote it"
-- Agent searches only `~/.hermes/profiles/indigo/skills/` and misses the `<fs-root>/soul/skills/` copy
+- Agent searches only `$HERMES_HOME/../indigo/skills/` and misses the `<fs-root>/soul/skills/` copy
 - The skill was written in a previous session (often during a long skill-writing session) but never installed
 
 ## Detection
@@ -23,18 +23,18 @@ This is distinct from the "orphan skills" pattern (skills in the active director
 During audit, check BOTH locations:
 ```bash
 # Active profile skills
-ls ~/.hermes/profiles/indigo/skills/
+ls $HERMES_HOME/../indigo/skills/
 # SOUL repo skills
 ls <fs-root>/soul/skills/
 ```
 
-Any skill directory in `<fs-root>/soul/skills/` that is NOT in `~/.hermes/profiles/indigo/skills/` is an install gap.
+Any skill directory in `<fs-root>/soul/skills/` that is NOT in `$HERMES_HOME/../indigo/skills/` is an install gap.
 
 ## Fix
 
 Copy the skill to the active profile:
 ```bash
-cp -r <fs-root>/soul/skills/<name> ~/.hermes/profiles/indigo/skills/<name>
+cp -r <fs-root>/soul/skills/<name> $HERMES_HOME/../indigo/skills/<name>
 ```
 
 Then verify it appears in `skills_list`.

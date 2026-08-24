@@ -71,7 +71,7 @@ Four repos + one enforcement skill system, ~1,550 files, ~32MB of design system 
 
 Reference files for design live under `~/.hermes/references/design/`. This is the current convention. If you find design references at old paths like `<fs-root>/references/creative/`, migrate them here.
 
-Responsive-design skill references live under `~/.hermes/profiles/indigo/skills/responsive-design/references/`.
+Responsive-design skill references live under `$HERMES_HOME/../indigo/skills/responsive-design/references/`.
 
 ## Updating
 
@@ -82,5 +82,5 @@ cd ~/.hermes/references/design/<repo> && git pull
 For the responsive-design skill (installed via agentskill.sh CLI):
 ```bash
 npx @agentskill.sh/cli@latest install @wshobson/responsive-design
-cp -r ~/.hermes/skills/responsive-design ~/.hermes/profiles/indigo/skills/responsive-design
+cp -r ~/.hermes/skills/responsive-design $HERMES_HOME/../indigo/skills/responsive-design
 ```

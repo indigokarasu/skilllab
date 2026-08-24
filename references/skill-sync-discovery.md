@@ -4,7 +4,7 @@ Reusable building blocks for the unified `skill-sync-all.sh`
 <<<<<<< Updated upstream
 (at `<hermes-home>/profiles/indigo/scripts/skill-sync-all.sh`). Embedded here so
 =======
-(at `~/.hermes/profiles/indigo/scripts/skill-sync-all.sh`). Embedded here so
+(at `$HERMES_HOME/../indigo/scripts/skill-sync-all.sh`). Embedded here so
 >>>>>>> Stashed changes
 the pattern survives even if the script is moved or rewritten.
 

@@ -22,7 +22,7 @@ Skills like `github-pr-workflow`, `github-issues`, `github-github-repo-managemen
 
 ### 3. The cross-profile write guard
 
-When <operator> says "KODA's skills," he means the profile at `~/.hermes/profiles/koda/skills/`. The active profile is `indigo`. Writing to KODA's skill directory triggers Hermes's cross-profile soft guard. **Fix:** use `cross_profile=True` on `write_file`/`patch` calls. The skilllab skill already documents scanning across profiles for reads, but should explicitly warn about the write guard for KODA-targeted operations.
+When <operator> says "KODA's skills," he means the profile at `$HERMES_HOME/../koda/skills/`. The active profile is `indigo`. Writing to KODA's skill directory triggers Hermes's cross-profile soft guard. **Fix:** use `cross_profile=True` on `write_file`/`patch` calls. The skilllab skill already documents scanning across profiles for reads, but should explicitly warn about the write guard for KODA-targeted operations.
 
 ### 4. Scoring distribution
 
