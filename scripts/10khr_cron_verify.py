@@ -137,15 +137,13 @@ def ondisk_check(skill_name, skill_path, runner):
 
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
-        msg = (
-            "Usage: python3 scripts/10khr_cron_verify.py [--help]\n"
-            "Cron-safe 10khr eligibility plus on-disk 5-dimension verification harness.\n"
-            "Assesses all ocas/util skills, applies the skip-rule against the runner\n"
-            "STATE_FILE, and prints real gaps vs over-scoring traps. No state mutation."
-        )
-        print(msg)
-        sys.exit(0)
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Cron-safe 10khr eligibility plus on-disk 5-dimension "
+                    "verification harness. Assesses all ocas/util skills, applies "
+                    "the skip-rule against the runner STATE_FILE, and prints real "
+                    "gaps vs over-scoring traps. No state mutation.")
+    parser.parse_args()
     runner = load_runner()
     state = runner.load_state()
     last_run = (datetime.fromisoformat(state["last_run"])
