@@ -5,7 +5,6 @@ import curses
 import os
 import re
 import sys
-import yaml
 
 SKILLS_DIR = os.path.expanduser("~/.hermes/profiles/indigo/skills")
 ARCHIVE_DIR = os.path.expanduser("~/.hermes/profiles/indigo/skills/.archive")
@@ -126,6 +125,10 @@ def parse_frontmatter(path):
             return info
         parts = content.split("---", 2)
         if len(parts) < 3:
+            return info
+        try:
+            import yaml  # deferred: keeps --help working without PyYAML installed
+        except ImportError:
             return info
         fm = yaml.safe_load(parts[1])
         if not fm:
