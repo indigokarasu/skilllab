@@ -117,12 +117,12 @@ def ondisk_check(skill_name, skill_path, runner):
             sp = os.path.join(sd, s)
             try:
                 if s.endswith(".py"):
-                    if _can_send(str(path)):
+                    if _can_send(str(sp)):
                         continue  # outbound: do not execute
                     rc = subprocess.run([sys.executable, sp, "--help"], input="",
                                         capture_output=True, text=True, timeout=30).returncode
                 else:
-                    if _can_send(str(path)):
+                    if _can_send(str(sp)):
                         continue  # outbound: do not execute
                     rc = subprocess.run(["bash", sp, "--help"], input="",
                                         capture_output=True, text=True, timeout=30).returncode
