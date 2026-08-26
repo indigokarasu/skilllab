@@ -256,7 +256,7 @@ def check_scripts_help(script_dir, execute=True):
             continue
 
         if execute:
-            cmd = ["bash", path, "--help"] if name.endswith(".sh") else [sys.executable, path, "--help"]
+            cmd = ["bash", name, "--help"] if name.endswith(".sh") else [sys.executable, name, "--help"]
             rc, _ = _run(cmd, cwd=script_dir)
             ok.append(name) if rc == 0 else broken.append("%s (rc=%d)" % (name, rc))
         else:

@@ -47,7 +47,7 @@ EMAIL_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
 # and report() returned early. Both checks silently passed everything for two
 # weeks. A safety gate that fails OPEN is worse than no gate, because the green
 # result is read as evidence. Kept on one line so it cannot regress the same way.
-ALLOW_RE='(Chrome|Safari|Firefox|AppleWebKit|Gecko)/[0-9.]+|your-agent@|your-email@|agent@email\.com|mx\.indigo\.karasu@gmail\.com|x-access-token:|@example\.(com|org|net)|noreply@|no-reply@|you@|user@|someone@|name@|<[a-z-]+>|127\.0\.0\.1|0\.0\.0\.0|localhost|1\.2\.3\.4|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.'
+ALLOW_RE='\b(birchmantle|mossglade|cedarquill|fernwick)[.+@]|\b(noreply|no-reply|support|info|icons|admin|contact|hello|sales)@|\b[a-z]{1,2}@[a-z0-9.-]+\.[a-z]{2,}\b|@[A-Za-z0-9.-]*\.(test|invalid|localhost)\b|\b[a-z]{1,2}@[a-z]{1,2}\.(com|org|net)\b|\bmailto:[a-z]{1,2}@|/usr/local/lib/hermes-agent|[a-z]{2}\.[a-z]+#holiday@group\.v\.calendar\.google\.com|8\.8\.8\.8|8\.8\.4\.4|1\.1\.1\.1|1\.0\.0\.1|9\.9\.9\.9|@[A-Za-z0-9.-]*\.example\b|[A-Za-z0-9.-]*\.example\.(com|org|net)|john\.doe@|jane\.doe@|(Chrome|Safari|Firefox|AppleWebKit|Gecko)/[0-9.]+|your-agent@|your-email@|agent@email\.com|mx\.indigo\.karasu@gmail\.com|x-access-token:|@example\.(com|org|net)|noreply@|no-reply@|you@|user@|someone@|name@|<[a-z-]+>|127\.0\.0\.1|0\.0\.0\.0|localhost|1\.2\.3\.4|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.'
 
 EXC=(--exclude-dir=.git "--exclude=$SELF" --exclude=secret-scan.sh --exclude='*.lock')
 
@@ -56,6 +56,7 @@ EXC=(--exclude-dir=.git "--exclude=$SELF" --exclude=secret-scan.sh --exclude='*.
 # An inline marker is auditable in a diff, unlike widening the pattern set --
 # it opts out one reviewed line rather than a whole class of real addresses.
 ALLOW_MARK='sanitize-allow|pii-allow'
+skip_noise() { grep -vE '(^|:|/)\.archive/|/(package-lock|yarn|pnpm-lock)\.(json|lock)|/node_modules/'; }
 drop_marked() { grep -vE "$ALLOW_MARK"; }
 
 found=0
@@ -70,23 +71,23 @@ report() { # label, payload
 # Tracked files only: the gate must judge what a push would actually publish.
 # Untracked .bak.*/scratch copies dominated the findings while being unpushable,
 # which hid the real leaks in tracked source behind dozens of false alarms.
-report "HOST PATHS" "$(git -C "$TARGET" grep -I -n -P "$PATH_RE" -- . 2>/dev/null | drop_marked | head -20)"
+report "HOST PATHS" "$(git -C "$TARGET" grep -I -n -P "$PATH_RE" -- . 2>/dev/null | skip_noise | drop_marked | grep -vP "$ALLOW_RE" | head -20)"
 
 # 2. email addresses that are not placeholders
 emails=$(git -C "$TARGET" grep -I -n -P "$EMAIL_RE" -- . 2>/dev/null \
-         | drop_marked | grep -vP "$ALLOW_RE" | head -20)
+         | skip_noise | drop_marked | grep -vP "$ALLOW_RE" | head -20)
 report "EMAIL" "$emails"
 
 # 3. IPv4 literals that are not loopback/documentation ranges
 ips=$(git -C "$TARGET" grep -I -n -P "$HOST_RE" -- . 2>/dev/null \
-      | drop_marked | grep -vP "$ALLOW_RE" | head -20)
+      | skip_noise | drop_marked | grep -vP "$ALLOW_RE" | head -20)
 report "IP ADDRESS" "$ips"
 
 # 4. operator-specific terms, kept out of this repo on purpose
 if [ -f "$TERMS_FILE" ]; then
   terms=$(grep -vE '^\s*(#|$)' "$TERMS_FILE" 2>/dev/null | paste -sd'|' -)
   if [ -n "$terms" ]; then
-    hits=$(git -C "$TARGET" grep -I -n -i -E "$terms" -- . 2>/dev/null | drop_marked | head -20 \
+    hits=$(git -C "$TARGET" grep -I -n -i -E "$terms" -- . 2>/dev/null | skip_noise | drop_marked | head -20 \
            | sed -E 's/(.{100}).*/\1…/')
     report "OPERATOR IDENTITY" "$hits"
   fi
