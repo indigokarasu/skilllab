@@ -16,7 +16,7 @@ description: >
   running code autofix on skill source, or writing arbitrary code unrelated to the skill library.
 metadata:
   author: Indigo Karasu (indigokarasu)
-  version: "3.6.0"
+  version: "3.7.0"
   merged-from: ocas-critique
   hermes:
     category: software-development
@@ -101,6 +101,8 @@ Checklist:
 Reviewing/critiquing/auditing a skill; iterating toward a target score; pre-publish quality gate; batch library audits; autonomous 10khr grinding.
 
 Score against the 10-dimension rubric (`references/critique-rubric.md`), fix to 50/50.
+
+**Local eval runner (skillgrade):** Integrate the `skillgrade` CLI tooling for **local, offline evaluation** of a skill's `eval.yaml` suite (`references/evals/eval.yaml`) prior to submitting variants. Run `skillgrade` against the local suite to validate behavior against the challenger variant before it is proposed to Monitor/Fellow — this is the gate between a candidate patch and a formal `ocas-fellow` benchmark. If a skill lacks `references/evals/eval.yaml`, note its absence in the critique rather than skipping evaluation entirely. See `spec-ocas-skill-improvements.md` §1.
 
 Example score row: `| D6 | 3 | rules lack "why" |` — gap named.
 
