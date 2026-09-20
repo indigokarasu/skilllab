@@ -47,6 +47,62 @@ class TestSanitizeSkill(unittest.TestCase):
                 content = f.read()
             self.assertEqual(content, normal_code)
 
+    def test_sanitize_multi_files_and_empty_dirs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Test empty subfolder does not cause UnboundLocalError
+            subdir = os.path.join(tmpdir, "empty_subdir")
+            os.makedirs(subdir)
+
+            # Test multiple files: non-last file has secret, last file is clean
+            f1 = os.path.join(tmpdir, "a_config.py")
+            f2 = os.path.join(tmpdir, "b_normal.py")
+            with open(f1, "w") as f:
+                f.write('OPENAI_KEY = "sk-1234567890123456789012345"\n')
+            with open(f2, "w") as f:
+                f.write('x = 100\n')
+
+            summary = skilllab.sanitize_skill("test-skill", tmpdir)
+            self.assertIn("a_config.py", summary)
+
+            with open(f1) as f:
+                content = f.read()
+            self.assertIn("${OPENAI_API_KEY}", content)
+
+    def test_sanitize_taglines_and_tool_refs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            readme = os.path.join(tmpdir, "README.md")
+            skill_md = os.path.join(tmpdir, "SKILL.md")
+            with open(readme, "w") as f:
+                f.write("# Skill\nTell it what you need. It does the work.\nPowered by Elephas.")
+            with open(skill_md, "w") as f:
+                f.write("# Skill MD\nOne clear job, done well.\n")
+
+            summary = skilllab.sanitize_skill("test-skill", tmpdir)
+            self.assertIn("README.md", summary)
+            self.assertIn("SKILL.md", summary)
+
+            with open(readme) as f:
+                readme_content = f.read()
+            self.assertNotIn("Tell it what you need.", readme_content)
+            self.assertIn("Operational skill for the OCAS family.", readme_content)
+            self.assertIn("See references/integration-notes.md", readme_content)
+
+            with open(skill_md) as f:
+                skill_content = f.read()
+            self.assertNotIn("One clear job, done well.", skill_content)
+
+    def test_sanitize_session_log_quarantine(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            session_file = os.path.join(tmpdir, "session-2026-01-01.md")
+            with open(session_file, "w") as f:
+                f.write("# Session Log\nDetails here.\n")
+
+            summary = skilllab.sanitize_skill("test-skill", tmpdir)
+            self.assertIn("session-2026-01-01.md", summary)
+            self.assertFalse(os.path.exists(session_file))
+            quarantined = os.path.join(tmpdir, ".archive", "session-logs-export", "session-2026-01-01.md")
+            self.assertTrue(os.path.exists(quarantined))
+
 
 class TestCodeRatio(unittest.TestCase):
     def test_empty_file_passes(self):
