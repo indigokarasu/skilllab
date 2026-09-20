@@ -11,6 +11,41 @@ SCRIPTS = os.path.join(SKILL_DIR, "scripts")
 sys.path.insert(0, SCRIPTS)
 
 import critique_code_ratio  # noqa: E402
+import skilllab  # noqa: E402
+
+
+class TestSanitizeSkill(unittest.TestCase):
+    def test_sanitize_secrets(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = os.path.join(tmpdir, "config.py")
+            with open(test_file, "w") as f:
+                f.write('OPENAI_KEY = "sk-1234567890123456789012345"\n')
+                f.write('STRIPE_KEY = "sk_live_1234567890abcdef"\n')
+                f.write('AWS_KEY = "AKIA1234567890ABCDEF"\n')
+
+            summary = skilllab.sanitize_skill("test-skill", tmpdir)
+            self.assertIn("config.py", summary)
+
+            with open(test_file) as f:
+                content = f.read()
+            self.assertIn("${OPENAI_API_KEY}", content)
+            self.assertIn("${STRIPE_LIVE_SECRET_KEY}", content)
+            self.assertIn("${AWS_ACCESS_KEY_ID}", content)
+            self.assertNotIn("sk-1234567890", content)
+
+    def test_sanitize_non_secret_bypass(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = os.path.join(tmpdir, "helper.py")
+            normal_code = "def add(a, b):\n    return a + b\n"
+            with open(test_file, "w") as f:
+                f.write(normal_code)
+
+            summary = skilllab.sanitize_skill("test-skill", tmpdir)
+            self.assertEqual(summary, {})
+
+            with open(test_file) as f:
+                content = f.read()
+            self.assertEqual(content, normal_code)
 
 
 class TestCodeRatio(unittest.TestCase):
