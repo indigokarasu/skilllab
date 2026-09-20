@@ -115,6 +115,20 @@ def scan_skills():
     return results
 
 
+_YAML_MODULE = None
+
+def _get_yaml():
+    """Cached PyYAML module loader to avoid repeated imports in loops."""
+    global _YAML_MODULE
+    if _YAML_MODULE is None:
+        try:
+            import yaml
+            _YAML_MODULE = yaml
+        except ImportError:
+            _YAML_MODULE = False
+    return _YAML_MODULE if _YAML_MODULE is not False else None
+
+
 def parse_frontmatter(path):
     """Parse YAML frontmatter from SKILL.md"""
     info = {"name": "", "description": "", "author": "", "license": "", "triggers": []}
@@ -126,9 +140,8 @@ def parse_frontmatter(path):
         parts = content.split("---", 2)
         if len(parts) < 3:
             return info
-        try:
-            import yaml  # deferred: keeps --help working without PyYAML installed
-        except ImportError:
+        yaml = _get_yaml()
+        if not yaml:
             return info
         fm = yaml.safe_load(parts[1])
         if not fm:
@@ -233,37 +246,41 @@ def sanitize_skill(name, skill_dir):
                     if n:
                         counts[pat.pattern] = counts.get(pat.pattern, 0) + n
 
-        # banned taglines in README / SKILL description prose
-        if is_readme or basename_lower == 'skill.md':
-            for tagline in _BANNED_TAGLINES:
-                if tagline in content:
-                    replacement = _README_TAGLINE_REPLACEMENT if is_readme else ''
-                    content = content.replace(tagline, replacement)
-                    counts[f'banned_tagline:{tagline}'] = counts.get(f'banned_tagline:{tagline}', 0) + 1
+            # Performance & correctness optimization: Process every file inside the file loop.
+            # Previously unindented block caused UnboundLocalError on empty dirs, skipped processing
+            # and file-saving for all non-last files, and wasted work on lost replacements.
 
-        # deprecated-tool references
-        for banned, replacement in _BANNED_TOOL_REFS:
-            if banned in content:
-                content = content.replace(banned, replacement)
-                counts[f'banned_tool_ref:{banned}'] = counts.get(f'banned_tool_ref:{banned}', 0) + 1
+            # banned taglines in README / SKILL description prose
+            if is_readme or basename_lower == 'skill.md':
+                for tagline in _BANNED_TAGLINES:
+                    if tagline in content:
+                        replacement = _README_TAGLINE_REPLACEMENT if is_readme else ''
+                        content = content.replace(tagline, replacement)
+                        counts[f'banned_tagline:{tagline}'] = counts.get(f'banned_tagline:{tagline}', 0) + 1
 
-        # quarantine session-log reference files
-        if any(pat.search(file) for pat in _SESSION_LOG_PATTERNS):
-            os.makedirs(session_log_quarantine_dir, exist_ok=True)
-            quarantine_path = os.path.join(session_log_quarantine_dir, file)
-            try:
-                os.replace(path, quarantine_path)
-                counts['session_log_quarantined'] = counts.get('session_log_quarantined', 0) + 1
-            except OSError:
-                pass
-            if counts.get('session_log_quarantined'):
+            # deprecated-tool references
+            for banned, replacement in _BANNED_TOOL_REFS:
+                if banned in content:
+                    content = content.replace(banned, replacement)
+                    counts[f'banned_tool_ref:{banned}'] = counts.get(f'banned_tool_ref:{banned}', 0) + 1
+
+            # quarantine session-log reference files
+            if any(pat.search(file) for pat in _SESSION_LOG_PATTERNS):
+                os.makedirs(session_log_quarantine_dir, exist_ok=True)
+                quarantine_path = os.path.join(session_log_quarantine_dir, file)
+                try:
+                    os.replace(path, quarantine_path)
+                    counts['session_log_quarantined'] = counts.get('session_log_quarantined', 0) + 1
+                except OSError:
+                    pass
+                if counts.get('session_log_quarantined'):
+                    summary[rel] = counts
+                    continue
+
+            if content != original:
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(content)
                 summary[rel] = counts
-                continue
-
-        if content != original:
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(content)
-            summary[rel] = counts
     return summary
 
 
