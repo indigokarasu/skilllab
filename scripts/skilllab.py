@@ -76,17 +76,28 @@ def draw_scroll_indicators(stdscr, row, scroll, visible, total_items):
 def scan_skills():
     """Return list of (name, path, has_author, has_license, has_triggers, is_archive).
 
-    Uses recursive glob to find skills at any depth across all profile directories.
+    Uses os.walk with directory pruning to find skills at any depth across all profile directories.
     Deduplicates by skill name (first found wins; active profile takes priority).
+    Prunes .git, .venv, node_modules, __pycache__, and .archive to avoid slow recursive traversal.
     """
-    import glob as _glob
     seen = set()
     results = []
 
     def _scan_dir(directory, is_archive=False):
         if not os.path.isdir(directory):
             return
-        for path in sorted(_glob.glob(f"{directory}/**/SKILL.md", recursive=True)):
+        found_paths = []
+        # Fast traversal: prune unnecessary subtrees before descending
+        for root, dirs, files in os.walk(directory):
+            dirs[:] = [
+                d for d in dirs
+                if d not in ('.git', '.venv', 'node_modules', '__pycache__')
+                and (is_archive or d != '.archive')
+            ]
+            if "SKILL.md" in files:
+                found_paths.append(os.path.join(root, "SKILL.md"))
+
+        for path in sorted(found_paths):
             name = os.path.basename(os.path.dirname(path))
             if name.startswith(".") or name == "__pycache__":
                 continue
