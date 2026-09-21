@@ -119,8 +119,17 @@ def find_all_skills(skills_dir: str = None, all_profiles: bool = False) -> list:
             continue
         seen_realpaths.add(real_root)
 
-        # Recursive glob: finds SKILL.md at any depth
-        for path in sorted(glob.glob(f"{root}/**/SKILL.md", recursive=True)):
+        # Fast directory traversal: use os.walk with directory pruning
+        found_paths = []
+        for r, dirs, files in os.walk(root):
+            dirs[:] = [
+                d for d in dirs
+                if d not in ('.git', '.venv', 'node_modules', '__pycache__', '.archive')
+            ]
+            if "SKILL.md" in files:
+                found_paths.append(os.path.join(r, "SKILL.md"))
+
+        for path in sorted(found_paths):
             real_path = os.path.realpath(path)
             name = os.path.basename(os.path.dirname(real_path))
             # Only include ocas-* and util-* prefixed skills
