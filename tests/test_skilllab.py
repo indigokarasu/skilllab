@@ -141,6 +141,26 @@ class TestRunnerHeuristics(unittest.TestCase):
             runner.load_state()
             self.assertEqual(open(runner.STATE_FILE).read(), before)
 
+    def test_ref_resolves_and_sibling_cache(self):
+        import critique_10khr_runner as runner
+        with tempfile.TemporaryDirectory() as tmpdir:
+            s1 = os.path.join(tmpdir, "ocas-one")
+            s2 = os.path.join(tmpdir, "ocas-two")
+            os.makedirs(os.path.join(s1, "references"))
+            os.makedirs(os.path.join(s2, "references"))
+
+            with open(os.path.join(s1, "references", "doc1.md"), "w") as f:
+                f.write("doc1")
+            with open(os.path.join(s2, "references", "doc2.md"), "w") as f:
+                f.write("doc2")
+
+            # Local reference resolves
+            self.assertTrue(runner._ref_resolves(s1, "references/doc1.md"))
+            # Sibling reference resolves via cached sibling basenames
+            self.assertTrue(runner._ref_resolves(s1, "references/doc2.md"))
+            # Missing reference returns False
+            self.assertFalse(runner._ref_resolves(s1, "references/nonexistent.md"))
+
 
 class TestScriptHelp(unittest.TestCase):
     """D9: every bundled script answers --help with exit 0."""
