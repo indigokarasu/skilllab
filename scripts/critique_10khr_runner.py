@@ -228,6 +228,16 @@ def _outbound_capable(name, src):
     return True
 
 
+def _is_cli_entrypoint(src: str) -> bool:
+    """True only for files with a real executable entry point."""
+    return bool(re.search(r"\bdef main\s*\(", src) or re.search(r"if\s+__name__\s*==\s*[\"']__main__[\"']", src))
+
+
+def _is_test_entrypoint(src: str) -> bool:
+    """Test runners execute assertions; they are not user-facing CLIs."""
+    return bool(re.search(r"\bdef test_\s*\(", src))
+
+
 def _flag_safe(name, src):
     """Does it handle --help before acting? (static, no execution)"""
     if name.endswith(".sh"):
@@ -237,12 +247,13 @@ def _flag_safe(name, src):
 
 
 def check_scripts_help(script_dir, execute=True):
-    """Do the scripts ACTUALLY answer --help? Returns (ok, broken, total).
+    """Do executable scripts ACTUALLY answer --help? Returns (ok, broken, total).
 
     Scripts that can post/send/trade are NEVER executed here -- see
     _outbound_capable(). They are judged statically on whether they handle the
     flag before acting. Executing them is how an audit published "--help" to a
-    live Bluesky account.
+    live Bluesky account. Library modules and test runners are not CLIs and are
+    documented separately by the skill's support-file map.
     """
     import os
     if not os.path.isdir(script_dir):
@@ -256,6 +267,13 @@ def check_scripts_help(script_dir, execute=True):
         except (OSError, UnicodeDecodeError):
             src = ""
 
+        if not src:
+            continue
+        if _is_test_entrypoint(src):
+            ok.append(name)
+            continue
+        if not _is_cli_entrypoint(src):
+            continue
         if src and _outbound_capable(name, src):
             # static only: side effects must not be triggered to test a flag
             if _flag_safe(name, src):
@@ -270,9 +288,10 @@ def check_scripts_help(script_dir, execute=True):
             rc, _ = _run(cmd, cwd=script_dir)
             ok.append(name) if rc == 0 else broken.append("%s (rc=%d)" % (name, rc))
         else:
-            if not src:
-                continue
-            ok.append(name) if "--help" in src else broken.append(name)
+            # argparse automatically provides -h/--help; don't require the
+            # literal flag string in source.
+            has_help = "--help" in src or "argparse.ArgumentParser" in src
+            ok.append(name) if has_help else broken.append(name)
     return ok, broken, len(scripts)
 
 
