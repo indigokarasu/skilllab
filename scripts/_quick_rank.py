@@ -121,4 +121,9 @@ def main():
     print(f"\n=== Total scored: {len(results)} ===")
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
+        print("Usage: python3 _quick_rank.py")
+        print("One-shot heuristic ranking of ocas-*/util-* skills: prints the 10 lowest scores.")
+        print("Ranking signal only — judge targets with the manual rubric, not this number.")
+        sys.exit(0)
     main()
