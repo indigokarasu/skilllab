@@ -16,7 +16,7 @@ description: >
   running code autofix on skill source, or writing arbitrary code unrelated to the skill library.
 metadata:
   author: Indigo Karasu (indigokarasu)
-  version: "3.7.0"
+  version: "3.7.1"
   merged-from: ocas-critique
   hermes:
     category: software-development
@@ -67,19 +67,19 @@ triggers:
 
 Skill library maintenance: audit, merge, rename, delete, consolidate, publish, sanitize.
 
-The library should hold class-level umbrellas, not micro-skills — prefer one broad skill with labeled subsections over five narrow siblings.
+Prefer class-level umbrellas, not micro-skills — one broad skill with labeled subsections over five narrow siblings.
 
 **Read `references/support-file-map.md` first** — full 60+ entry index with per-task "When to read" pointers.
 
 ## Interactive Menu
 
-When invoked interactively, present a menu using the `clarify` tool: Audit, Critique, Merge, Rename, Delete, Publish, Sanitize, Hygiene, Exit. Pattern: `references/interactive-menu.md`.
+When invoked interactively, present a menu via the `clarify` tool — Audit, Critique, Merge, Rename, Delete, Publish, Sanitize, Hygiene, Exit. Pattern: `references/interactive-menu.md`.
 
 ## 1. Skill Taxonomy
 
 - `ocas-*` — OCAS family, authored by <agent-name>. `util-*` — utility skills, same author.
 - No prefix — base/generic; may have external authors.
-- **Conventions:** never rename to `ocas-*`/`util-*` unless asked; discover via recursive glob across ALL profiles (why: flat scans silently miss whole profiles); protected = bundled/hub-installed (DO NOT edit); auto-generated (`metadata.hermes.generated_by`) = DELETE; author lives in BOTH `author:` and `metadata.author:`.
+- **Conventions:** never rename to `ocas-*`/`util-*` unless asked; recursive-glob ALL profiles (why: flat scans miss profiles); protected = bundled/hub (DO NOT edit); `generated_by` = DELETE; author in BOTH `author:` and `metadata.author:`.
 
 ## 2. Audit Procedure
 
@@ -98,30 +98,22 @@ Checklist:
 
 ### When to Use
 
-Reviewing/critiquing/auditing a skill; iterating toward a target score; pre-publish quality gate; batch library audits; autonomous 10khr grinding.
+Critiquing/auditing a skill; iterating to a target score; pre-publish gate; batch audits; autonomous 10khr.
 
 Score against the 10-dimension rubric (`references/critique-rubric.md`), fix to 50/50.
 
-**Local eval runner (skillgrade):** Integrate the `skillgrade` CLI tooling for **local, offline evaluation** of a skill's `eval.yaml` suite (`references/evals/eval.yaml`) prior to submitting variants. Run `skillgrade` against the local suite to validate behavior against the challenger variant before it is proposed to Monitor/Fellow — this is the gate between a candidate patch and a formal `ocas-fellow` benchmark. If a skill lacks `references/evals/eval.yaml`, note its absence in the critique rather than skipping evaluation entirely. See `spec-ocas-skill-improvements.md` §1.
+**skillgrade (optional):** if a `skillgrade` CLI exists, evaluate a challenger variant against the target skill's local `eval.yaml` suite before a Monitor/Fellow submission; no suite ⇒ note it. Otherwise use rubric scoring.
 
-Example score row: `| D6 | 3 | rules lack "why" |` — gap named.
+Score rows name the gap: `| D6 | 3 | rules lack "why" |`.
 
-| Command | What it does |
-|---------|-------------|
-| `critique.assess <path>` | Score only |
-| `critique.plan <path>` | Score + improvement plan |
-| `critique.run <path>` | Score → fix → verify |
-| `critique.iterate <path>` | Fix-verify loop until 50/50 |
-| `critique.batch [paths]` | Ranked table of multiple skills |
-| `critique.perfect <skill>` | Grind one skill to 50/50 |
-| `critique.10khr` | Autonomous library grinding |
+Commands (+ comparison helpers): `references/critique-quick-reference.md`.
 
 Critique checklist:
 - [ ] Phase 1 Read: full SKILL.md + references + scripts; flag >500 lines; hunt phantom refs AND contradictions (align to authoritative section); check prohibitions for rules encoding failed attempts
 - [ ] Phase 2 Score: code ratio first (`python3 scripts/critique_code_ratio.py <path>/SKILL.md`, target <20%); score D1–D10; print table (bands A=40–50 … F=0–9)
 - [ ] Phase 3 Categorize each ≤3 dimension issue Critical / Major / Minor (`references/critique-issue-categorization.md`)
 - [ ] Phase 4 Plan: Location / Current state / Fix / Impact per issue (`references/critique-improvement-plan-template.md`)
-- [ ] Phase 5 Execute Critical→Major→Minor; verify syntax after each edit. For 3+ section extractions use one full-file rewrite (why: sequential patches drift anchors and duplicate headers). Replace absolute paths in moved blocks with `{agent_root}/`.
+- [ ] Phase 5 Execute Critical→Major→Minor; verify syntax after each edit. For 3+ section extractions use one full-file rewrite (why: patches drift anchors/duplicate headers). Replace absolute paths in moved blocks with `{agent_root}/`.
 - [ ] Phase 6 Verify: re-read, re-score, before/after table (`references/critique-audit-checklist.md`)
 - [ ] Phase 7 Close every 4/5 and 3/5 gap — apply the rubric's "5" criteria as concrete targets. A 48/50 is NOT done.
 
@@ -129,8 +121,8 @@ Reject rationalizations ("come back later", "skip minors", "good enough"). Marke
 
 ### 10khr Mode
 
-- [ ] Run `python3 scripts/10khr_cron_verify.py` FIRST in any autonomous pass — its output is authoritative for what to grind (do NOT also import the runner and re-walk mtimes by hand)
-- [ ] Assess ALL skills recursively across all profiles before fixing any
+- [ ] Run `python3 scripts/10khr_cron_verify.py` FIRST in any autonomous pass — authoritative for what to grind (do NOT import the runner and re-walk mtimes by hand)
+- [ ] Assess ALL skills (all profiles) before fixing any
 - [ ] Grind the single lowest-scoring eligible skill **to 50/50**, re-assess, repeat
 
 Rules:
@@ -138,7 +130,7 @@ Rules:
 - **Skip rule:** if a skill's SKILL.md is unmodified since `last_run` AND heuristic ≥44, skip it. All unmodified ≥44 ⇒ stop.
 - **Scope:** 10khr critiques SKILL.md + references + scripts as a documentation package — it does NOT mean running autofix on script source.
 - **Never run `--report-only` when you need the skip rule intact** (why: it rewrites `last_run` to now, making every skill read as modified). Import the module and call `run_full_assessment()` without `save_state` instead.
-- Dated narratives behind every rule: `references/skilllab-pitfalls.md` ("Extracted" appendix) + `references/critique-10khr-grind-pitfalls.md`; cron constraints: `references/cron-grind-resilience.md`. When to read: any grind misbehavior.
+- Dated narratives + cron constraints: `references/skilllab-pitfalls.md`, `references/critique-10khr-grind-pitfalls.md`, `references/cron-grind-resilience.md` (read on any grind misbehavior).
 
 ### Error Handling
 
@@ -161,7 +153,7 @@ Steps when absorbing B into A:
 - [ ] Archive B to `$HERMES_HOME/../indigo/skills/.archive/<B>/`
 - [ ] Update all external references (crons, memory, other skills)
 
-Package integrity: never flatten only SKILL.md while leaving support files behind. Parallel-copy dedupe: 7-step superset-verified procedure in `references/merge-parallel-copy-dedupe.md` — read before ANY cross-tree dedupe; never delete a tree until its Step-3 check reports 0 missing files (why: trees diverge silently; blind deletion destroys data).
+Package integrity: never flatten only SKILL.md while leaving support files behind. Cross-tree dedupe: 7-step superset-verified procedure — read `references/merge-parallel-copy-dedupe.md` BEFORE any; never delete a tree until Step-3 reports 0 missing files (why: trees diverge silently).
 
 ## 5. Rename
 
@@ -175,26 +167,26 @@ Update checklist (missing any causes stale refs):
 - [ ] grep old name across skills dir + profile md files; update crons, memories, SOUL/AGENT/USER.md, sibling "When NOT to Use" sections
 - [ ] Restart the gateway — clears the injected index/autocomplete; directory/frontmatter names must match 
 
-New skill: create dir → delete `.skills_prompt_snapshot.json` (regenerates; else never indexed) → sibling relationships → cron if scheduled → gateway restart.
+New skill: create dir → delete `.skills_prompt_snapshot.json` (else never indexed) → wire siblings/cron → gateway restart.
 
 ## 6. Publish
 
-**Read `source:` BEFORE any repo operation** — monorepo target ⇒ sync the subdir, never create a standalone repo (why: orphan repos the `source:` field doesn't reference).
+**Read `source:` BEFORE any repo operation** — monorepo target ⇒ sync the subdir (why: orphan repos the field doesn't reference).
 
-Workflow: check `source:` → spec compliance (`references/skill-publish-spec-compliance-checklist.md`; agentskills.io requires `name` + keyword-rich `description`; strip Hermes-only extensions) → sanitize PII → standalone only: repo create + LICENSE/README/.gitignore → push → public.
+Workflow: check `source:` → spec compliance (`references/skill-publish-spec-compliance-checklist.md`; agentskills.io: `name` + keyword-rich `description`, no Hermes-only extensions) → sanitize PII → standalone: repo + LICENSE/README/.gitignore → push → public.
 
 GitHub mechanics:
 - Push recipe: `references/skill-publish-github-push-recipe.md`; bulk sync: `references/skill-publish-github-sync-existing-skills.md`
-- One authenticated GitHub account ⇒ use it; do not ask which (wasted round-trip)
+- Use the one authenticated GitHub account; don't ask which (wasted round-trip).
 - If HTTPS push fails on credentials: run `gh auth setup-git` once, retry (why: git isn't using the gh token by default)
-- Daily sync: ONE cron `skill-sync-all` (04:00) running `skill-sync-all.sh` (indigo automation dir), superseding the paused `ocas-skilllab-sync` + `monorepo-skill-sync`. Discovers ocas/util/eng skills by rule (`references/skill-sync-discovery.md`); idempotent; sets agent identity.
+- Daily sync: ONE cron `skill-sync-all` (04:00, `skill-sync-all.sh`) — supersedes the paused `ocas-skilllab-sync` + `monorepo-skill-sync`; rule-based discovery (`references/skill-sync-discovery.md`); idempotent.
 - Sync gates use `--working-tree` secret-scan mode (full history false-blocks pushes over old committed prose); full mode only for pre-publish audits
 
 Share to Nous optional-skills: full procedure (config-policy gate, category table, prerequisites) in `references/skilllab-share-procedure.md` — When to read: immediately before preparing any submission.
 
 ## 7. Secret Scan Gate
 
-Policy: no secrets in local/remote skills except the private backup repo — and even there, secrets belong in env files, not skills. A skill is NOT committable until `bash scripts/secret-scan.sh <dir>` exits 0.
+Policy: no secrets in skills — including the private backup repo (secrets belong in env files). Not committable until `bash scripts/secret-scan.sh <dir>` exits 0.
 
 ```bash
 bash scripts/secret-scan.sh <dir>                        # tree + .git/config + ALL history
@@ -205,7 +197,7 @@ Remediation (history rewrite, rotation): `references/secret-history-rewrite.md` 
 
 ## 8. Frontmatter Standards
 
-Minimum: `name`, `description`, `license` (right after name), `includes:` if support dirs exist, `triggers:` for discoverability. Nest `metadata.hermes` properly (`metadata:\n  hermes:\n    category:`) — a literal top-level `metadata.hermes:` key still scores D1=4. Full reference: `references/skilllab-frontmatter-standards.md`.
+Minimum: `name`, `description`, `license` (first after name), `includes:` if support dirs exist, `triggers:` for discovery. Nest `metadata.hermes` (`metadata:\n  hermes:\n    category:`) — a literal top-level `metadata.hermes:` key scores D1=4. Full reference: `references/skilllab-frontmatter-standards.md`.
 
 ## 9. Pitfalls (Top Rules)
 
@@ -217,18 +209,17 @@ Full list (60+, plus extracted dated narratives): `references/skilllab-pitfalls.
 - **D6 wants a "why" on every rigid rule** so agents can adapt to edge cases.
 - **All scripts need executable `--help`** exiting 0; guard must precede module-level side effects; bash guards define every downstream variable under `set -u`. Pattern: `references/critique-10khr-d9-help-injection.md`.
 - **Read the FULL skill before acting** — name/description guesses produce wrong moves.
-- **Verify superset before deleting parallel trees**; back up to `_backup_<date>/` first. List skills from the filesystem, tersely — never from memory.
+- **Verify superset before deleting parallel trees**; back up first. List skills from the filesystem — never from memory.
 - **Edit the LIVE profile skill**, not the indigo-repo backup copy.
 - **Re-validate frontmatter after any patch** (leading whitespace breaks YAML).
 - **Recursive discovery everywhere** — never `os.listdir()` or flat globs.
 - **Cross-profile writes need `cross_profile=True`** after confirming the owning profile.
 - **Bulk edits: one file at a time**, verify after each; recover corruption with `git checkout -- .`, never `git clean -fd`.
-- **A SANITIZE-BLOCKED repo silently accumulates stuck changes** — check `cron/output/skill-sync-all.log` for `SANITIZE-BLOCKED` entries; scrub the flagged lines (host paths → `~` form, operator name → role word, synthetic fixtures → inline `# pii-allow` marker) and the next sync unblocks. Blocked for days = local work never pushed.
-- **Sanitize terms are substring matches — guard against longer words** — a surname term also matches longer words like German 'Zimmermann', tripping surname datasets (ocas-scout). Use a suffix guard `term([^a-z]|$)`. After ANY terms-file edit, verify with a standalone grep (`grep -vE '^\s*(#|$)' ~/.hermes/.sanitize-terms | paste -sd'|' -`, then test lines through `grep -i -E "$TERMS"`); a malformed regex fails OPEN (empty hits = everything passes).
-- **Terms check runs without the ALLOW_RE allowlist** — a terms entry can contradict the gate's own allowlist (e.g. a venv-path term vs the allowed install root). Remediate refs to placeholders (`<hermes-venv>`), not by editing the term.
+- **SANITIZE-BLOCKED repos silently accumulate stuck changes** — check `cron/output/skill-sync-all.log`; scrub flagged lines (host paths → `~` form, operator name → role word, fixtures → `# pii-allow`) and the next sync unblocks.
+- **Sanitize terms are substring matches — guard longer words** with `term([^a-z]|$)`; after ANY terms-file edit verify with a standalone grep — a malformed regex fails OPEN (empty hits pass everything).
+- **Terms check runs without the ALLOW_RE allowlist** — remediate refs to placeholders (`<hermes-venv>`), not by editing the term.
+- Full detail: `references/skilllab-pitfalls.md`.
 
 ## 10. External Tool Evaluation & Retired Capabilities
 
-New external tool systems follow `references/tool-integration-pattern.md` (docs → map to existing skills → delegate → build new only at 24+ commands; pitfall: over-integration).
-
-Retire a capability: grep old name → classify refs (prose→replace, section→remove, logs→leave) → rename support files + cache keys → re-grep to confirm zero refs (excluding `.archive/`).
+New external tool systems: `references/tool-integration-pattern.md` (docs → map to existing skills → delegate → build only at 24+ commands; pitfall: over-integration). Retire a capability: grep old name → classify refs (prose→replace, section→remove, logs→leave) → rename support files + cache keys → re-grep to zero refs (excluding `.archive/`).

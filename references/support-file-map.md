@@ -70,3 +70,23 @@ conditional **When to read** column so the agent loads only what each operation 
 | `references/skill-publish-github-mechanics.md` | Dated GitHub playbooks: new monorepo creation, existing-remote reconciliation, bulk rename, eng-skills namespace | When doing those four repo operations |
 | `references/secret-history-rewrite.md` | Secret remediation playbook incl. git filter-branch history rewrite + rotation | When secret-scan.sh exits 1 and a real secret needs scrubbing |
 | `references/rename-cache-updates.md` | Exact cache-key rewrite snippets for renames | During a skill rename |
+
+## Added 2026-09-24 (grind batch)
+
+| File | Description | When to read |
+|------|-------------|--------------|
+| `references/grind-workflow.md` | Condensed operational grind procedure | During 10khr — grind steps, skip logic, state bookkeeping |
+| `references/monorepo-bulk-restructure.md` | Bulk-restructure procedure + lessons | When bulk-restructuring skill trees |
+| `references/sanitize-pii-leaks.md` | PII scrub patterns + verification | When sanitizing a skill for PII leaks |
+| `references/critique-10khr-bulk-edit-git-safety.md` | Git safety rules for bulk edits | Before any bulk edit across skill repos — recovery rules |
+| `references/critique-patch-tool-frontmatter-gotchas.md` | Frontmatter fence gotchas | During SKILL.md edits with patch tools |
+| `references/critique-10khr-2026-05-31.md` | Session log | May 31 grinding — historical reference |
+| `references/critique-10khr-2026-06-26-session.md` | Session log | June 26 grinding — historical reference |
+| `references/scripts.md` | Script inventory notes | When updating the script index |
+| `references/interactive-menu.md` | Interactive menu pattern | When building an interactive menu |
+| `scripts/skilllab.py` | Interactive TUI menu | For menu-driven maintenance — run with no arguments |
+| `scripts/_quick_rank.py` | One-shot heuristic ranking | For a fast lowest-10 ranking pass |
+| `scripts/heuristic_score.py` | Library-wide heuristic scoring | For ranking-only sweeps — never a verdict |
+| `scripts/10khr_cron_verify.py` | Eligibility + on-disk verify harness | First step of any autonomous grind pass |
+| `scripts/skill-sync-push.sh` | Push one skill repo | During publish sync (skill-sync-all cron) |
+| `scripts/sanitize-skill-push-gate.sh` | Push sanitize gate | Before pushing a skill repo |

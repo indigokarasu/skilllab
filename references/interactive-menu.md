@@ -40,4 +40,4 @@ Match the user's response against the full choice string. Extract the action key
 
 ## Platform Adaptation
 
-On CLI, choices are navigable with arrow keys. On messaging platforms, choices render as a numbered list. The max-4-choices rule applies at every menu level.
+On CLI, choices are navigable with arrow keys. On messaging platforms, choices render as a numbered list. The max-4-choices rule applies at every menu level. For skills with more than 4 actions, use a two-level hierarchy.
