@@ -223,6 +223,7 @@ Full list (60+, plus extracted dated narratives): `references/skilllab-pitfalls.
 - **Recursive discovery everywhere** — never `os.listdir()` or flat globs.
 - **Cross-profile writes need `cross_profile=True`** after confirming the owning profile.
 - **Bulk edits: one file at a time**, verify after each; recover corruption with `git checkout -- .`, never `git clean -fd`.
+- **A SANITIZE-BLOCKED repo silently accumulates stuck changes** — check `cron/output/skill-sync-all.log` for `SANITIZE-BLOCKED` entries; scrub the flagged lines (host paths → `~` form, operator name → role word, synthetic fixtures → inline `# pii-allow` marker) and the next sync unblocks. Blocked for days = local work never pushed.
 
 ## 10. External Tool Evaluation & Retired Capabilities
 

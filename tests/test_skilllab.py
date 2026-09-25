@@ -19,9 +19,9 @@ class TestSanitizeSkill(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = os.path.join(tmpdir, "config.py")
             with open(test_file, "w") as f:
-                f.write('OPENAI_KEY = "sk-1234567890123456789012345"\n')
-                f.write('STRIPE_KEY = "sk_live_1234567890abcdef"\n')
-                f.write('AWS_KEY = "AKIA1234567890ABCDEF"\n')
+                f.write('OPENAI_KEY = "sk-1234567890123456789012345"\n')  # secret-allow
+                f.write('STRIPE_KEY = "sk_live_1234567890abcdef"\n')  # secret-allow
+                f.write('AWS_KEY = "AKIA1234567890ABCDEF"\n')  # secret-allow
 
             summary = skilllab.sanitize_skill("test-skill", tmpdir)
             self.assertIn("config.py", summary)
@@ -57,7 +57,7 @@ class TestSanitizeSkill(unittest.TestCase):
             f1 = os.path.join(tmpdir, "a_config.py")
             f2 = os.path.join(tmpdir, "b_normal.py")
             with open(f1, "w") as f:
-                f.write('OPENAI_KEY = "sk-1234567890123456789012345"\n')
+                f.write('OPENAI_KEY = "sk-1234567890123456789012345"\n')  # secret-allow
             with open(f2, "w") as f:
                 f.write('x = 100\n')
 
