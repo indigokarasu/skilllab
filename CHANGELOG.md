@@ -15,3 +15,8 @@
 ### Changed
 - `scripts/_quick_rank.py` gained a proper `--help` guard (previously `--help` ran the full ranking).
 - `references/scripts.md` script index brought up to date.
+
+## [3.7.2] - 2026-09-25
+
+### Fixed
+- `critique_10khr_runner.py` module-scope import check no longer misclassifies: stdlib detection now uses `sys.stdlib_module_names` (zoneinfo/fcntl were missing from the regex whitelist), and bundled sibling modules whose own import chains stay within the bundle are not flagged (recursive, cycle-safe). Surfaced while verifying `ocas-rally` (49/50 → 50/50); genuine third-party module-scope imports are still flagged.
