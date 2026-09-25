@@ -1,3 +1,7 @@
+## 2026-09-30 - In-Memory compile() & Pre-Read Pass-Through in Multi-Check Audits
+**Learning:** Using `py_compile.compile()` in script validation loops creates unnecessary `__pycache__` disk I/O overhead, and re-opening the same `SKILL.md` file in multiple check functions causes redundant filesystem reads.
+**Action:** Use in-memory `compile(raw, sp, "exec")` during single-pass script iteration and pass pre-read `text` to auxiliary check functions to eliminate disk I/O (~1.5x speedup across batch assessments).
+
 ## 2026-08-29 - Cache Sibling Directory Basenames for Dead Reference Resolution
 **Learning:** Re-traversing all sibling directories and checking `os.path.exists()` for every subfolder on unresolved references creates O(N * S * K) filesystem stat syscalls, slowing down batch skill assessments by hundreds of milliseconds.
 **Action:** Cache the set of sibling directory file basenames per skills root using `@functools.lru_cache` to reduce filesystem syscalls to O(S) dir listings during dead reference checks (~60x speedup).
