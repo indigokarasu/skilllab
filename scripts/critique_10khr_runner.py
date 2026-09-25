@@ -306,8 +306,12 @@ def _is_stdlib_module(base):
     return bool(STDLIB_OK.match(base))
 
 
+@functools.lru_cache(maxsize=128)
 def _module_scope_import_bases(path):
-    """Top-level module names imported at module scope of a .py file (None on parse failure)."""
+    """Top-level module names imported at module scope of a .py file (None on parse failure).
+
+    Cached to avoid re-reading and re-parsing ASTs when inspecting sibling script imports.
+    """
     import ast
     try:
         tree = ast.parse(io.open(path, encoding="utf-8", errors="ignore").read())
@@ -433,18 +437,19 @@ _PLACEHOLDER = re.compile(
     r"^(X|Y|Z|foo|bar|baz|example|template|your_\w+|my_\w+)\.(py|sh|md)$", re.I)
 
 
-def check_dead_references(skill_dir):
+def check_dead_references(skill_dir, text=None):
     """Files SKILL.md points at that do not exist anywhere reachable.
 
     A pointer to a doc that was never written is a promise the skill cannot
     keep; an agent that follows it wastes a turn and loses trust in the rest
-    of the file.
+    of the file. Accepting pre-read text avoids redundant disk reads.
     """
-    sk = os.path.join(skill_dir, "SKILL.md")
-    try:
-        text = io.open(sk, encoding="utf-8", errors="ignore").read()
-    except OSError:
-        return []
+    if text is None:
+        sk = os.path.join(skill_dir, "SKILL.md")
+        try:
+            text = io.open(sk, encoding="utf-8", errors="ignore").read()
+        except OSError:
+            return []
     refs = set(re.findall(
         r"(?:[A-Za-z0-9._\-]+/)*(?:references|scripts|assets|templates)/[A-Za-z0-9._\-/]+",
         text))
@@ -460,20 +465,22 @@ def check_dead_references(skill_dir):
     return sorted(dead)
 
 
-def check_frontmatter_parses(skill_dir):
+def check_frontmatter_parses(skill_dir, text=None):
     """Frontmatter must PARSE, not merely contain the right field names.
 
     The previous check was a regex for `name:`, which matches even when
     unresolved merge-conflict markers sit between the --- fences. Twelve
     public skills shipped that way: every field was "present", the YAML was
     invalid, and the skill would not load for anyone who installed it.
+    Accepting pre-read text avoids redundant disk reads.
     """
     problems = []
-    sk = os.path.join(skill_dir, "SKILL.md")
-    try:
-        text = io.open(sk, encoding="utf-8", errors="ignore").read()
-    except OSError:
-        return ["SKILL.md unreadable"]
+    if text is None:
+        sk = os.path.join(skill_dir, "SKILL.md")
+        try:
+            text = io.open(sk, encoding="utf-8", errors="ignore").read()
+        except OSError:
+            return ["SKILL.md unreadable"]
 
     if re.search(r"^(<{7} |={7}$|>{7} )", text, re.M):
         problems.append("unresolved merge-conflict markers in SKILL.md")
@@ -514,8 +521,11 @@ def check_correctness(skill_dir):
     if not glob.glob(os.path.join(skill_dir, ".github", "workflows", "*.y*ml")):
         score -= 1; findings.append("no CI workflow")
 
-    # Report EVERY unguarded destructive call, sorted (glob order is arbitrary).
+    # Performance optimization: Single-pass script inspection.
+    # Checks for destructive patterns and verifies compilation in-memory via compile()
+    # to eliminate redundant script reads and unnecessary __pycache__ disk writes.
     hits = []
+    compile_failed = False
     for sp in sorted(glob.glob(os.path.join(skill_dir, "scripts", "*"))):
         if not sp.endswith((".py", ".sh")):
             continue
@@ -523,6 +533,15 @@ def check_correctness(skill_dir):
             raw = io.open(sp, encoding="utf-8", errors="ignore").read()
         except (OSError, UnicodeDecodeError):
             continue
+
+        if sp.endswith(".py") and not compile_failed:
+            try:
+                compile(raw, sp, "exec")
+            except Exception:
+                score -= 1
+                findings.append("%s does not compile" % os.path.basename(sp))
+                compile_failed = True
+
         code = "\n".join(l for l in raw.splitlines() if not l.lstrip().startswith("#"))
         if GUARD.search(code):
             continue
@@ -534,12 +553,6 @@ def check_correctness(skill_dir):
                 hits.append("%s in %s" % (lbl, os.path.basename(sp)))
     if hits:
         score -= 2; findings.append("unguarded " + "; ".join(sorted(set(hits))))
-
-    for sp in sorted(glob.glob(os.path.join(skill_dir, "scripts", "*.py"))):
-        try:
-            py_compile.compile(sp, doraise=True)
-        except Exception:
-            score -= 1; findings.append("%s does not compile" % os.path.basename(sp)); break
 
     imp = check_module_scope_imports(os.path.join(skill_dir, "scripts"))
     if imp:
@@ -677,11 +690,12 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
     # doc problem cannot dominate the safety signal in this dimension.
     # Invalid frontmatter means the skill does not load at all -- a harder
     # failure than anything else measured here, so it is not a soft deduction.
-    _fm = check_frontmatter_parses(skill_dir)
+    # Pass pre-read content to avoid redundant disk open/read operations
+    _fm = check_frontmatter_parses(skill_dir, text=content)
     if _fm:
         d8 = max(0, d8 - 2)
         correctness_findings.extend(_fm)
-    _dead_refs = check_dead_references(skill_dir)
+    _dead_refs = check_dead_references(skill_dir, text=content)
     if _dead_refs:
         d8 = max(0, d8 - min(2, len(_dead_refs)))
         correctness_findings.append(
