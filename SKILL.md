@@ -224,6 +224,8 @@ Full list (60+, plus extracted dated narratives): `references/skilllab-pitfalls.
 - **Cross-profile writes need `cross_profile=True`** after confirming the owning profile.
 - **Bulk edits: one file at a time**, verify after each; recover corruption with `git checkout -- .`, never `git clean -fd`.
 - **A SANITIZE-BLOCKED repo silently accumulates stuck changes** — check `cron/output/skill-sync-all.log` for `SANITIZE-BLOCKED` entries; scrub the flagged lines (host paths → `~` form, operator name → role word, synthetic fixtures → inline `# pii-allow` marker) and the next sync unblocks. Blocked for days = local work never pushed.
+- **Sanitize terms are substring matches — guard against longer words** — a surname term also matches longer words like German 'Zimmermann', tripping surname datasets (ocas-scout). Use a suffix guard `term([^a-z]|$)`. After ANY terms-file edit, verify with a standalone grep (`grep -vE '^\s*(#|$)' ~/.hermes/.sanitize-terms | paste -sd'|' -`, then test lines through `grep -i -E "$TERMS"`); a malformed regex fails OPEN (empty hits = everything passes).
+- **Terms check runs without the ALLOW_RE allowlist** — a terms entry can contradict the gate's own allowlist (e.g. a venv-path term vs the allowed install root). Remediate refs to placeholders (`<hermes-venv>`), not by editing the term.
 
 ## 10. External Tool Evaluation & Retired Capabilities
 
