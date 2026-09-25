@@ -16,7 +16,7 @@ description: >
   running code autofix on skill source, or writing arbitrary code unrelated to the skill library.
 metadata:
   author: Indigo Karasu (indigokarasu)
-  version: "3.7.1"
+  version: "3.7.2"
   merged-from: ocas-critique
   hermes:
     category: software-development

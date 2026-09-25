@@ -175,7 +175,8 @@ STDLIB_OK = re.compile(
     r"traceback|warnings|copy|string|struct|socket|threading|queue|signal|platform|"
     r"curses|shlex|select|errno|stat|difflib|pprint|pickle|gzip|tarfile|zipfile|"
     r"secrets|statistics|decimal|fractions|numbers|operator|bisect|heapq|array|"
-    r"configparser|getpass|inspect|importlib|contextlib|abc|__future__)$")
+    r"configparser|getpass|inspect|importlib|contextlib|abc|__future__|"
+    r"zoneinfo|fcntl)$")  # zoneinfo/fcntl added 2026-09-25; canonical check = _is_stdlib_module
 
 
 def _run(cmd, cwd=None):
@@ -295,30 +296,77 @@ def check_scripts_help(script_dir, execute=True):
     return ok, broken, len(scripts)
 
 
+def _is_stdlib_module(base):
+    """Canonical stdlib membership (sys.stdlib_module_names), regex as fallback."""
+    try:
+        if base in sys.stdlib_module_names:
+            return True
+    except AttributeError:
+        pass
+    return bool(STDLIB_OK.match(base))
+
+
+def _module_scope_import_bases(path):
+    """Top-level module names imported at module scope of a .py file (None on parse failure)."""
+    import ast
+    try:
+        tree = ast.parse(io.open(path, encoding="utf-8", errors="ignore").read())
+    except (OSError, UnicodeDecodeError, SyntaxError):
+        return None
+    bases = []
+    for node in tree.body:                           # module scope only
+        if isinstance(node, ast.Import):
+            bases += [a.name.split(".")[0] for a in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            bases.append(node.module.split(".")[0])
+    return bases
+
+
 def check_module_scope_imports(script_dir):
     """Third-party imports at module scope break --help wherever they're absent.
 
     Executing --help only proves it works in THIS interpreter. A module-scope
     optional import exits before argparse on any machine lacking it — the exact
     failure an all-deps environment cannot reveal.
+
+    Not defects, so not flagged:
+    - stdlib modules — canonical list via sys.stdlib_module_names (the hand-kept
+      regex had gaps, e.g. zoneinfo/fcntl).
+    - sibling modules bundled in the same scripts/ dir: they ship with the
+      script and cannot be "absent" — unless a sibling's own module-scope
+      imports depart the bundle; that is checked recursively (cycle-safe).
     """
-    import ast, glob, os
+    import glob, os
     offenders = []
     for sp in sorted(glob.glob(os.path.join(script_dir, "*.py"))):
-        try:
-            tree = ast.parse(io.open(sp, encoding="utf-8", errors="ignore").read())
-        except (OSError, UnicodeDecodeError, SyntaxError):
-            continue
-        for node in tree.body:                       # module scope only
-            mods = []
-            if isinstance(node, ast.Import):
-                mods = [a.name for a in node.names]
-            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                mods = [node.module]
-            hit = next((m for m in mods if not STDLIB_OK.match(m.split(".")[0])), None)
-            if hit:
-                offenders.append("%s: %s" % (os.path.basename(sp), hit.split(".")[0]))
-                break
+        seen = {os.path.splitext(os.path.basename(sp))[0]}
+
+        def first_absent(path, depth=0):
+            bases = _module_scope_import_bases(path)
+            if bases is None:
+                return None
+            for base in bases:
+                if _is_stdlib_module(base):
+                    continue
+                sib_py = os.path.join(script_dir, base + ".py")
+                sib_pkg = os.path.join(script_dir, base, "__init__.py")
+                if os.path.exists(sib_py) or os.path.exists(sib_pkg):
+                    if base in seen:
+                        continue              # already vetted from this entry point
+                    if depth >= 4:
+                        return base           # chain too deep to vet — keep flagged
+                    seen.add(base)
+                    sub = first_absent(
+                        sib_py if os.path.exists(sib_py) else sib_pkg, depth + 1)
+                    if sub:
+                        return sub
+                    continue
+                return base
+            return None
+
+        hit = first_absent(sp)
+        if hit:
+            offenders.append("%s: %s" % (os.path.basename(sp), hit))
     return offenders
 
 
