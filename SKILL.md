@@ -1,4 +1,5 @@
 ---
+warning: 'FALSE TRIGGER RISK: Has had 86% false trigger rate on interactive loads (19/22 auto). This skill handles skill library maintenance — audit, merge, rename, delete, consolidate. Do NOT load for routine skill queries, documentation lookups, or when the task is not explicitly about skill library management. Updated 2026-09-25: rate increased from 73% (16/22).'
 name: ocas-skilllab
 license: MIT
 description: >

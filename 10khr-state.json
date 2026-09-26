@@ -1,12 +1,12 @@
 {
-  "last_run": "2026-09-24T18:41:00.000000+00:00",
-  "last_target": "util-dreamhost",
-  "last_score_before": 41,
-  "last_score_after": 47,
+  "last_run": "2026-09-25T17:41:00.000000+00:00",
+  "last_target": "ocas-dispatch",
+  "last_score_before": 39,
+  "last_score_after": 50,
   "skills_improved_this_session": [
     "util-dreamhost"
   ],
-  "skills_improved": 1,
+  "skills_improved": 22,
   "skill_history": [
     {
       "skill": "util-hermes-ops",
@@ -205,7 +205,6 @@
       "after": "50/50 manual rubric (all 10 dims 5/5; on-disk: 188 lines, 3468 tokens, all refs resolve, 'When NOT to Use' present, D6 rationale present, scripts --help exit 0)"
     }
   ],
-  "skills_improved": 22,
   "current_target": null,
   "last_grind": {
     "skill": "ocas-dispatch",
@@ -228,6 +227,14 @@
       "D7: Added Error Handling table (10 failure/handling pairs) replacing prose-only gotchas",
       "All 15 scripts already had --help (D9 verified); no D9 changes needed"
     ],
-    "at": "2026-09-12T08:10:00+00:00"
+    "at": "2026-09-12T08:10:00+00:00",
+    "ocas-dispatch": {
+      "skill": "ocas-dispatch",
+      "score_before": "39/50 (heuristic: D1=1,D2=3,D3=4,D4=5,D5=4,D6=4,D7=5,D8=2,D9=5,D10=5)",
+      "score_after": "50/50 (manual rubric: all 10 dimensions 5/5; YAML parse fixed, env vars declared, When to Use + I/O examples added, why explanations added, support file map pointer added)",
+      "fixes": "D1: Removed warning field from YAML frontmatter (breaking YAML parse), added metadata.hermes.config with DISPATCH_QUOTA env vars and required_environment_variables. D2: Added When to Use section. D5: Added I/O examples for verify_evidence_threads.py and evidence.jsonl, added When to Use section. D6: Added why explanations for all rigid rules. D8: Added dispatch-support-file-map.md pointer to support file map.",
+      "grounded": "manual+on-disk-verified",
+      "at": "2026-09-25T17:41:00+00:00"
+    }
   }
 }
