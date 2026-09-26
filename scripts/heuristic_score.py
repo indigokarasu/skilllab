@@ -62,11 +62,20 @@ def check_correctness(skill_dir):
         d8 = max(0, d8 - 1)
     return d8, findings
 
-def check_frontmatter_parses(skill_dir):
-    skill_md = os.path.join(skill_dir, "SKILL.md")
-    with open(skill_md) as f:
-        content = f.read()
-    parts = content.split("---")
+def check_frontmatter_parses(skill_dir, text=None):
+    """Verify frontmatter parses as valid YAML.
+
+    Performance optimization: accepts pre-read `text` to eliminate redundant disk
+    open/read operations during batch skill assessment.
+    """
+    if text is None:
+        skill_md = os.path.join(skill_dir, "SKILL.md")
+        try:
+            with open(skill_md) as f:
+                text = f.read()
+        except OSError:
+            return False
+    parts = text.split("---")
     if len(parts) < 3:
         return False
     try:
@@ -75,13 +84,22 @@ def check_frontmatter_parses(skill_dir):
     except Exception:
         return False
 
-def check_dead_references(skill_dir):
-    skill_md = os.path.join(skill_dir, "SKILL.md")
-    with open(skill_md) as f:
-        content = f.read()
-    links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', content)
+def check_dead_references(skill_dir, text=None):
+    """Find references/ links in SKILL.md that do not exist.
+
+    Performance optimization: accepts pre-read `text` to avoid re-opening SKILL.md
+    from disk during scoring loops.
+    """
+    if text is None:
+        skill_md = os.path.join(skill_dir, "SKILL.md")
+        try:
+            with open(skill_md) as f:
+                text = f.read()
+        except OSError:
+            return []
+    links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', text)
     dead = []
-    for text, url in links:
+    for text_match, url in links:
         if url.startswith('references/'):
             ref_path = os.path.join(skill_dir, url)
             if not os.path.exists(ref_path):
@@ -152,11 +170,12 @@ def score_skill(name, path):
     if "gotcha" in cl or "pitfall" in cl: d7 += 1
     if "error" in cl and "handling" in cl: d7 += 1
     
-    # D8
+    # D8 - Pass pre-read content to check_frontmatter_parses and check_dead_references
+    # to eliminate redundant disk I/O (saves 2 file open/read calls per skill).
     d8, cf = check_correctness(skill_dir)
-    fm_valid = check_frontmatter_parses(skill_dir)
+    fm_valid = check_frontmatter_parses(skill_dir, text=content)
     if fm_valid is False: d8 = max(0, d8 - 2)
-    dead = check_dead_references(skill_dir)
+    dead = check_dead_references(skill_dir, text=content)
     if dead: d8 = max(0, d8 - min(2, len(dead)))
     
     # D9

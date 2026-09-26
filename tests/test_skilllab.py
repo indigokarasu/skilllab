@@ -11,6 +11,7 @@ SCRIPTS = os.path.join(SKILL_DIR, "scripts")
 sys.path.insert(0, SCRIPTS)
 
 import critique_code_ratio  # noqa: E402
+import heuristic_score  # noqa: E402
 import skilllab  # noqa: E402
 
 
@@ -125,6 +126,51 @@ class TestCodeRatio(unittest.TestCase):
             self.assertGreaterEqual(r["ratio"], 30)
         finally:
             os.unlink(path)
+
+
+class TestHeuristicScore(unittest.TestCase):
+    def test_check_frontmatter_parses_with_and_without_text(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_md = os.path.join(tmpdir, "SKILL.md")
+            content = "---\nname: test\ndescription: A test skill\n---\n# Body"
+            with open(skill_md, "w") as f:
+                f.write(content)
+
+            # Test passing pre-read text (optimized fast path)
+            self.assertTrue(heuristic_score.check_frontmatter_parses(tmpdir, text=content))
+            # Test default disk-read path (text=None)
+            self.assertTrue(heuristic_score.check_frontmatter_parses(tmpdir))
+
+    def test_check_dead_references_with_and_without_text(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_md = os.path.join(tmpdir, "SKILL.md")
+            content = "Check [doc](references/missing.md) and [ok](references/existing.md)"
+            with open(skill_md, "w") as f:
+                f.write(content)
+
+            refs_dir = os.path.join(tmpdir, "references")
+            os.makedirs(refs_dir)
+            with open(os.path.join(refs_dir, "existing.md"), "w") as f:
+                f.write("existing")
+
+            # Test passing pre-read text (optimized fast path)
+            dead_fast = heuristic_score.check_dead_references(tmpdir, text=content)
+            self.assertEqual(dead_fast, ["references/missing.md"])
+
+            # Test default disk-read path (text=None)
+            dead_disk = heuristic_score.check_dead_references(tmpdir)
+            self.assertEqual(dead_disk, ["references/missing.md"])
+
+    def test_score_skill_uses_pre_read_text(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_md = os.path.join(tmpdir, "SKILL.md")
+            content = "---\nname: test-skill\ndescription: A test skill\nlicense: MIT\n---\n# Test\n"
+            with open(skill_md, "w") as f:
+                f.write(content)
+
+            res = heuristic_score.score_skill("test-skill", skill_md)
+            self.assertEqual(res["skill"], "test-skill")
+            self.assertIn("D1", res["dims"])
 
 
 class TestRunnerHeuristics(unittest.TestCase):
