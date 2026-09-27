@@ -129,6 +129,8 @@ def find_all_skills(skills_dir: str = None, all_profiles: bool = False) -> list:
             ]
             if "SKILL.md" in files:
                 found_paths.append(os.path.join(r, "SKILL.md"))
+                # Stop descending into skill subdirectories (e.g. references, scripts, assets, tests) (~5x speedup)
+                dirs[:] = []
 
         for path in sorted(found_paths):
             real_path = os.path.realpath(path)

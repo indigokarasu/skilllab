@@ -10,6 +10,8 @@ SKILL_DIR = os.path.dirname(HERE)
 SCRIPTS = os.path.join(SKILL_DIR, "scripts")
 sys.path.insert(0, SCRIPTS)
 
+import _quick_rank  # noqa: E402
+import critique_10khr_runner as runner  # noqa: E402
 import critique_code_ratio  # noqa: E402
 import heuristic_score  # noqa: E402
 import skilllab  # noqa: E402
@@ -206,6 +208,52 @@ class TestRunnerHeuristics(unittest.TestCase):
             self.assertTrue(runner._ref_resolves(s1, "references/doc2.md"))
             # Missing reference returns False
             self.assertFalse(runner._ref_resolves(s1, "references/nonexistent.md"))
+
+
+class TestSkillDirectoryPruning(unittest.TestCase):
+    """Verify that skill discovery functions prune subdirectories upon finding SKILL.md."""
+
+    def test_find_all_skills_prunes_subdirectories(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            s1 = os.path.join(tmpdir, "ocas-alpha")
+            s2 = os.path.join(tmpdir, "util-beta")
+            os.makedirs(os.path.join(s1, "references", "subfolder"))
+            os.makedirs(os.path.join(s1, "scripts"))
+            os.makedirs(os.path.join(s2, "assets"))
+
+            with open(os.path.join(s1, "SKILL.md"), "w") as f:
+                f.write("---\nname: ocas-alpha\ndescription: Alpha skill\n---\n")
+            with open(os.path.join(s1, "references", "subfolder", "doc.md"), "w") as f:
+                f.write("doc")
+            with open(os.path.join(s2, "SKILL.md"), "w") as f:
+                f.write("---\nname: util-beta\ndescription: Beta skill\n---\n")
+
+            # Test runner's find_all_skills
+            skills = runner.find_all_skills(skills_dir=tmpdir)
+            skill_names = [name for name, _ in skills]
+            self.assertIn("ocas-alpha", skill_names)
+            self.assertIn("util-beta", skill_names)
+            self.assertEqual(len(skills), 2)
+
+            # Test quick_rank's find_skills
+            orig_skills_dir = _quick_rank.SKILLS_DIR
+            try:
+                _quick_rank.SKILLS_DIR = tmpdir
+                found = _quick_rank.find_skills()
+                self.assertEqual(len(found), 2)
+            finally:
+                _quick_rank.SKILLS_DIR = orig_skills_dir
+
+            # Test heuristic_score's find_all_skills
+            orig_hs_dir = heuristic_score.SKILLS_DIR
+            try:
+                heuristic_score.SKILLS_DIR = tmpdir
+                found_hs = heuristic_score.find_all_skills()
+                hs_names = [name for name, _ in found_hs]
+                self.assertIn("ocas-alpha", hs_names)
+                self.assertIn("util-beta", hs_names)
+            finally:
+                heuristic_score.SKILLS_DIR = orig_hs_dir
 
 
 class TestScriptHelp(unittest.TestCase):

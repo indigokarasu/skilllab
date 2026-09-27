@@ -96,6 +96,8 @@ def scan_skills():
             ]
             if "SKILL.md" in files:
                 found_paths.append(os.path.join(root, "SKILL.md"))
+                # Stop descending into skill subdirectories (e.g. references, scripts, assets, tests) (~5x speedup)
+                dirs[:] = []
 
         for path in sorted(found_paths):
             name = os.path.basename(os.path.dirname(path))

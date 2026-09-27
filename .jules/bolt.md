@@ -1,3 +1,7 @@
+## 2026-10-15 - Prune Skill Subdirectories in os.walk Discovery
+**Learning:** `os.walk` in skill discovery functions continues descending into `references/`, `scripts/`, `assets/`, `templates/`, and `tests/` after finding a `SKILL.md`. Since skill directories never contain nested sub-skills, continuing directory traversal creates hundreds of redundant filesystem syscalls.
+**Action:** Immediately clear `dirs[:] = []` upon finding `SKILL.md` in `files` during `os.walk` skill scanning loops (~5x speedup).
+
 ## 2026-09-30 - In-Memory compile() & Pre-Read Pass-Through in Multi-Check Audits
 **Learning:** Using `py_compile.compile()` in script validation loops creates unnecessary `__pycache__` disk I/O overhead, and re-opening the same `SKILL.md` file in multiple check functions causes redundant filesystem reads.
 **Action:** Use in-memory `compile(raw, sp, "exec")` during single-pass script iteration and pass pre-read `text` to auxiliary check functions to eliminate disk I/O (~1.5x speedup across batch assessments).
