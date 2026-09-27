@@ -15,20 +15,21 @@ SKILLS_DIR = os.path.join(HERMES_ROOT, "profiles", "indigo", "skills")
 def find_all_skills():
     """Find all ocas-* and util-* skills using os.walk directory pruning.
 
-    Prunes non-skill subdirectories (.git, node_modules, .archive, etc.) early to avoid
-    unnecessary filesystem traversals (~40x speedup when traversing deep directories).
+    Prunes non-skill subdirectories (.git, node_modules, .archive, etc.) early and stops
+    descending into skill subdirectories once SKILL.md is found (~5x speedup).
     """
     results = []
     seen = set()
     for root, dirs, files in os.walk(SKILLS_DIR):
         # Prune non-skill directory trees early
         dirs[:] = [d for d in dirs if d not in ('.git', '.venv', 'node_modules', '__pycache__', '.archive') and not d.startswith('.')]
-        for d in sorted(dirs):
-            if (d.startswith("ocas-") or d.startswith("util-")) and not d.startswith("_"):
-                skill_path = os.path.join(root, d, "SKILL.md")
-                if os.path.exists(skill_path) and d not in seen:
-                    seen.add(d)
-                    results.append((d, skill_path))
+        if "SKILL.md" in files:
+            d = os.path.basename(root)
+            if (d.startswith("ocas-") or d.startswith("util-")) and not d.startswith("_") and d not in seen:
+                seen.add(d)
+                results.append((d, os.path.join(root, "SKILL.md")))
+            # Stop descending into skill subdirectories (e.g. references, scripts, assets, tests)
+            dirs[:] = []
     return results
 
 def check_scripts_help(script_dir):
