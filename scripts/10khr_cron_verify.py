@@ -91,11 +91,14 @@ def ondisk_check(skill_name, skill_path, runner):
 
     # D5: checklist — search the WHOLE skill dir (main + references/), because
     # a `- [ ]` quality checklist may legitimately live in a referenced file.
+    # Prune non-skill/heavy subdirectories (.git, .venv, node_modules, __pycache__, .archive) for fast traversal.
     has_cb = "- [ ]" in content
     if not has_cb:
-        for root, _, files in os.walk(d):
-            if ".archive" in root:
-                continue
+        for root, dirs, files in os.walk(d):
+            dirs[:] = [
+                d for d in dirs
+                if d not in ('.git', '.venv', 'node_modules', '__pycache__', '.archive')
+            ]
             for fn in files:
                 if not fn.endswith(".md"):
                     continue
