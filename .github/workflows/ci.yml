@@ -13,6 +13,8 @@ jobs:
         with:
           python-version: "3.11"
       - name: Run unit tests
+        env:
+          PYTHONPATH: scripts
         run: python3 -m unittest discover -s tests
       - name: Verify every script answers --help (D9)
         run: |
