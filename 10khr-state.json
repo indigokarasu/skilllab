@@ -1,13 +1,22 @@
 {
-  "last_run": "2026-09-28T05:40:00+00:00",
-  "last_target": "util-github",
-  "last_score_before": 41,
-  "last_score_after": 50,
+  "last_run": "2026-09-28T18:23:00+00:00",
+  "last_target": "util-voice-call",
+  "last_score_before": 42,
+  "last_score_after": 46,
   "skills_improved_this_session": [
-    "util-imessage-ingest"
+    "util-voice-call"
   ],
   "skills_improved": 25,
   "skill_history": [
+    {
+      "skill": "util-voice-call",
+      "score_before": "42/50 heuristic. Manual rubric: D1=4 [name was the last frontmatter key before the closing fence; license present but buried; 18 env vars read by scripts declared nowhere -- no required_environment_variables], D2=5, D3=3 [the SSL/cert options, the 8-step <Gather speech> flow, the 6-item real-time env list, and 6 A2P/carrier gotchas all inline], D4=4 [386 lines, 5753 approx tokens over the 5000 target], D5=4 [checklists present but no I/O example of any output artifact], D6=4, D7=5 [13-row error table], D8=4 [map covered 14 of 15 references, several with static topic descriptions], D9=5 [VERIFIED: all 8 scripts exit 0 on --help with zero side effects, on a host with no credentials and none of the optional deps installed], D10=4 [no CHANGELOG]",
+      "score_after": "46/50 heuristic, D1 4->5. Body 19,039 chars / 4,799 tokens, under the 5000 D4 target. Verified on-disk + live --help probes on all 8 scripts + YAML/reference-integrity script.",
+      "fixes": "D1 (the substantive one): the scripts read 28 env vars across 10 patterns but only 10 were declared in metadata.hermes.config. Added required_environment_variables for the 6 that gate real operation, and config entries for the Telnyx/Plivo/storage/testing vars; reordered frontmatter to spec (name first, license top-level, source/triggers ahead of metadata). D3/D4: extracted three new references -- server-deployment.md (cert options, the media-fetcher-vs-webhook asymmetry, the turn-by-turn gather flow), environment-variables.md (all 28 vars grouped by purpose), a2p-carrier-gotchas.md (30034/21712/30896, messaging_service_sid routing, VoIP blocking, the two messaging services). Modes became a 5-row table; Provider setup collapsed to two lines; duplicate barge-in statement and a stale 'see Expose the server' cross-ref (heading was renamed) removed. D5: added the transcribe.py output schema as a JSON example -- grounded by reading the writer, then proven consumable by clip_audio.py's own loader -- plus the batch --output-dir form. D8: map now covers all 18 references and all 8 scripts, each with a conditional When-to-read. D10: CHANGELOG.md created; activate_voice_cert.sh flagged as mutating system state.",
+      "grounded": "manual+on-disk+live-help-probes+YAML-and-reference-integrity-script+io-schema-round-trip",
+      "at": "2026-09-28T18:23:00+00:00",
+      "note": "Skip condition NOT met: SKILL.md mtime 2026-09-25 23:07 is BEFORE last_run 2026-09-28 05:40, but heuristic 42 < 44 so the >=44 exemption did not apply; grinding required. D9 was already 5 -- live --help probes on all 8 scripts produced no state writes (only .pyc bytecode, gitignored), breaking the run of the last three 10khr runs which each found a --help side-effect bug; this skill had been hardened already. D3/D4 remain 3/4 and CANNOT reach 5/5 on this scorer: it computes approx_tokens as len(whole file)/4, so the 3,776-char frontmatter that D1 requires counts against the D4 5000-token budget, and the body alone is already 4,799. Reaching 5/5 would mean deleting declared env vars, which breaks the real D1 rule -- I did not game the scorer. Two defects I introduced and caught against the source: a patch fuzzy-match replaced a working example phone number with a masked form (restored to +15551234567, a fictional but valid-format E.164), and placing license after a 700-char description pushed it past the heuristic's content[:500] window (moved it up, which is also more spec-correct). util-voice-call is off the sub-50 leaderboard; next target moved to ocas-finch (43)."
+    },
     {
       "skill": "util-imessage-ingest",
       "score_before": "41/50 heuristic. Manual rubric: D1=3 [no includes:, no triggers, no metadata.hermes.config despite 17 IMSG_*/CHRONICLE_DB env vars read by the scripts, no required_environment_variables], D2=3 [description 245 chars, no keyword list, no NOT clause], D3=3 [54-line inline gotcha block; the eight pipeline-level gotchas belong in a reference], D4=4 [209 lines but support file map covered only 4 of 7 references], D5=3 [no checkboxes, no I/O examples], D6=3 [rigid rules stated with zero rationale -- stage order, watermark advance, no-retry, explicit --db], D7=2 [no error handling table anywhere in SKILL.md], D8=3 [support file map had a When column but was static-topic, and 3 references were unmapped], D9=1 [LIVE HAZARD: every shell script ran its real work on ANY argument including --help. Probing them during the audit executed a real spool read, a real scp push, and the full three-stage pipeline -- applied the spool, archived the file, enqueued 62 embed jobs and a 200-day backfill batch], D10=4 [no CHANGELOG; two reference files never mentioned in the body]",

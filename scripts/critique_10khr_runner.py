@@ -463,8 +463,46 @@ def check_dead_references(skill_dir, text=None):
         if _PLACEHOLDER.search(base):
             continue
         if not _ref_resolves(skill_dir, r):
-            dead.append(r)
+            # The regex above captures only the path SUFFIX starting at the
+            # first references|scripts|assets|templates segment, so a fully
+            # qualified pointer like
+            #   ~/.hermes/profiles/indigo/commons/email-templates/job_search.py
+            # arrives here as "templates/job_search.py" — which resolves against
+            # nothing, and is reported dead even though the real file exists.
+            # Before declaring death, retry with the full leading path that
+            # the regex dropped, and accept a hit anywhere under the profile.
+            if not _ref_resolves_absorbed(skill_dir, r, text):
+                dead.append(r)
     return sorted(dead)
+
+
+def _ref_resolves_absorbed(skill_dir, ref, text):
+    """Second-chance resolution for a reference whose leading path was eaten.
+
+    ``check_dead_references``'s regex anchors on the first
+    ``references|scripts|assets|templates`` segment, so a pointer written as
+    ``~/.hermes/profiles/indigo/commons/email-templates/job_search.py`` is
+    captured only as ``templates/job_search.py``. The relative resolution in
+    ``_ref_resolves`` then fails and a real, existing file gets reported dead.
+
+    This re-scans the source text for the full path that leads into the
+    captured suffix, expands ``~`` and ``$HOME``, and checks existence
+    directly. Returns True when the real file is found.
+    """
+    suffix = ref
+    # Every line that mentions the captured suffix may carry the full path.
+    for line in text.splitlines():
+        if suffix not in line:
+            continue
+        for m in re.finditer(r"([~\$][A-Za-z0-9_./\-]*/[^\s`'\"),;]+)", line):
+            full = m.group(1)
+            # Only consider candidates that actually end in the captured ref.
+            if not full.endswith(suffix):
+                continue
+            candidate = os.path.expandvars(os.path.expanduser(full))
+            if os.path.exists(os.path.normpath(candidate)):
+                return True
+    return False
 
 
 def check_frontmatter_parses(skill_dir, text=None):
