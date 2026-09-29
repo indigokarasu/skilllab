@@ -13,7 +13,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, "/root/.hermes/profiles/indigo/skills/ocas-skilllab/scripts")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 
 from critique_10khr_runner import check_dead_references
 
