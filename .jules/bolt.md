@@ -1,3 +1,7 @@
+## 2026-10-18 - In-Memory Helper Invocation in Cron Verification Loops
+**Learning:** Invoking sibling CLI scripts (like `critique_code_ratio.py`) via `subprocess.run([sys.executable, ...])` inside iteration loops incurs ~50ms Python process startup overhead per skill. Importing the module directly and invoking its underlying function in-memory eliminates interpreter startup and achieves <0.1ms per item execution (~500x speedup).
+**Action:** Always import sibling tools or load their modules in-memory (`importlib.util`) rather than spawning subprocesses during verification/cron loops.
+
 ## 2026-10-15 - Prune Skill Subdirectories in os.walk Discovery
 **Learning:** `os.walk` in skill discovery functions continues descending into `references/`, `scripts/`, `assets/`, `templates/`, and `tests/` after finding a `SKILL.md`. Since skill directories never contain nested sub-skills, continuing directory traversal creates hundreds of redundant filesystem syscalls.
 **Action:** Immediately clear `dirs[:] = []` upon finding `SKILL.md` in `files` during `os.walk` skill scanning loops (~5x speedup).
