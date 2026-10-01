@@ -10,11 +10,16 @@ SKILL_DIR = os.path.dirname(HERE)
 SCRIPTS = os.path.join(SKILL_DIR, "scripts")
 sys.path.insert(0, SCRIPTS)
 
+import importlib.util
 import _quick_rank  # noqa: E402
 import critique_10khr_runner as runner  # noqa: E402
 import critique_code_ratio  # noqa: E402
 import heuristic_score  # noqa: E402
 import skilllab  # noqa: E402
+
+spec_cron = importlib.util.spec_from_file_location("cron_verify", os.path.join(SCRIPTS, "10khr_cron_verify.py"))
+cron_verify = importlib.util.module_from_spec(spec_cron)
+spec_cron.loader.exec_module(cron_verify)
 
 
 class TestSanitizeSkill(unittest.TestCase):
@@ -185,9 +190,12 @@ class TestRunnerHeuristics(unittest.TestCase):
         # load_state must not create or write the canonical state file
         import critique_10khr_runner as runner
         if os.path.exists(runner.STATE_FILE):
-            before = open(runner.STATE_FILE).read()
+            with open(runner.STATE_FILE) as f:
+                before = f.read()
             runner.load_state()
-            self.assertEqual(open(runner.STATE_FILE).read(), before)
+            with open(runner.STATE_FILE) as f:
+                after = f.read()
+            self.assertEqual(after, before)
 
     def test_ref_resolves_and_sibling_cache(self):
         import critique_10khr_runner as runner
@@ -254,6 +262,33 @@ class TestSkillDirectoryPruning(unittest.TestCase):
                 self.assertIn("util-beta", hs_names)
             finally:
                 heuristic_score.SKILLS_DIR = orig_hs_dir
+
+
+class TestCronVerify(unittest.TestCase):
+    """Unit tests for 10khr_cron_verify.py."""
+
+    def test_ondisk_check(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_md = os.path.join(tmpdir, "SKILL.md")
+            content = (
+                "---\n"
+                "name: test-skill\n"
+                "description: A test skill\n"
+                "metadata:\n"
+                "  hermes:\n"
+                "    category: software-development\n"
+                "---\n"
+                "# Test Skill\n"
+                "- [ ] Checklist item 1\n"
+            )
+            with open(skill_md, "w") as f:
+                f.write(content)
+
+            chk = cron_verify.ondisk_check("test-skill", skill_md, runner)
+            self.assertTrue(chk.get("D1") == "OK" or "YAML ERR" in chk.get("D1", ""))
+            self.assertTrue(chk.get("D3", "").startswith("pass"))
+            self.assertEqual(chk.get("D5"), "OK")
+            self.assertIn("wc_lines", chk)
 
 
 class TestScriptHelp(unittest.TestCase):
