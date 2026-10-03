@@ -1,3 +1,7 @@
+## 2026-10-19 - Fast-Path os.path.isdir & os.listdir Over glob.glob in Verification Loops
+**Learning:** `glob.glob()` on optional skill subdirectories (like `.github/workflows/*.yml` or `scripts/*`) initializes regex pattern matchers and attempts directory listings even when subdirectories do not exist. Guarding with `os.path.isdir()` and using `os.listdir()` completely skips missing subdirectories without glob pattern matching overhead.
+**Action:** Replace `glob.glob()` in batch verification loops with `os.path.isdir()` checks and `os.listdir()` iterations.
+
 ## 2026-10-18 - In-Memory Helper Invocation in Cron Verification Loops
 **Learning:** Invoking sibling CLI scripts (like `critique_code_ratio.py`) via `subprocess.run([sys.executable, ...])` inside iteration loops incurs ~50ms Python process startup overhead per skill. Importing the module directly and invoking its underlying function in-memory eliminates interpreter startup and achieves <0.1ms per item execution (~500x speedup).
 **Action:** Always import sibling tools or load their modules in-memory (`importlib.util`) rather than spawning subprocesses during verification/cron loops.

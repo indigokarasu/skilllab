@@ -12,6 +12,7 @@ def find_skills():
         dirs[:] = [
             d for d in dirs
             if d not in ('.git', '.venv', 'node_modules', '__pycache__', '.archive')
+            and not d.startswith('.')
         ]
         if "SKILL.md" in files:
             paths.append(os.path.join(root, "SKILL.md"))

@@ -36,6 +36,12 @@ import glob
 import functools
 from datetime import datetime, timezone
 
+# Module-level PyYAML import to avoid repeated dynamic import calls during assessment loops
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 # Default: scan the indigo profile (active profile) recursively
@@ -126,6 +132,7 @@ def find_all_skills(skills_dir: str = None, all_profiles: bool = False) -> list:
             dirs[:] = [
                 d for d in dirs
                 if d not in ('.git', '.venv', 'node_modules', '__pycache__', '.archive')
+                and not d.startswith('.')
             ]
             if "SKILL.md" in files:
                 found_paths.append(os.path.join(r, "SKILL.md"))
@@ -360,10 +367,16 @@ def check_module_scope_imports(script_dir):
       script and cannot be "absent" — unless a sibling's own module-scope
       imports depart the bundle; that is checked recursively (cycle-safe).
     """
-    import glob, os
+    import os
+    if not os.path.isdir(script_dir):
+        return []
     offenders = []
-    for sp in sorted(glob.glob(os.path.join(script_dir, "*.py"))):
-        seen = {os.path.splitext(os.path.basename(sp))[0]}
+    # Performance optimization: os.listdir is faster than glob.glob and avoids pattern init overhead
+    for f in sorted(os.listdir(script_dir)):
+        if not f.endswith(".py"):
+            continue
+        sp = os.path.join(script_dir, f)
+        seen = {os.path.splitext(f)[0]}
 
         def first_absent(path, depth=0):
             bases = _module_scope_import_bases(path)
@@ -559,8 +572,7 @@ def check_frontmatter_parses(skill_dir, text=None):
         problems.append("no YAML frontmatter block")
         return problems
     try:
-        import yaml
-        meta = yaml.safe_load(m.group(1))
+        meta = yaml.safe_load(m.group(1)) if yaml else {}
     except Exception as e:
         problems.append("frontmatter does not parse: %s" % type(e).__name__)
         return problems
@@ -575,11 +587,12 @@ def check_frontmatter_parses(skill_dir, text=None):
 
 def check_correctness(skill_dir):
     """D8: does the skill demonstrate it works, and is it safe to run?"""
-    import glob, os
+    import os
     findings, score = [], 5
 
+    # Performance optimization: os.path.isdir and os.listdir avoiding glob overhead
     tdir = os.path.join(skill_dir, "tests")
-    if not (os.path.isdir(tdir) and glob.glob(os.path.join(tdir, "test_*.py"))):
+    if not (os.path.isdir(tdir) and any(f.startswith("test_") and f.endswith(".py") for f in os.listdir(tdir))):
         score -= 2; findings.append("no tests")
     else:
         rc, out = _run([sys.executable, "-m", "unittest", "discover", "-s", "tests"], cwd=skill_dir)
@@ -587,44 +600,48 @@ def check_correctness(skill_dir):
             score -= 2
             findings.append("tests FAIL: " + (out.strip().splitlines() or ["?"])[-1][:60])
 
-    if not glob.glob(os.path.join(skill_dir, ".github", "workflows", "*.y*ml")):
+    wf_dir = os.path.join(skill_dir, ".github", "workflows")
+    if not (os.path.isdir(wf_dir) and any(f.endswith((".yml", ".yaml")) for f in os.listdir(wf_dir))):
         score -= 1; findings.append("no CI workflow")
 
-    # Performance optimization: Single-pass script inspection.
+    # Performance optimization: Single-pass script inspection using os.listdir.
     # Checks for destructive patterns and verifies compilation in-memory via compile()
     # to eliminate redundant script reads and unnecessary __pycache__ disk writes.
     hits = []
     compile_failed = False
-    for sp in sorted(glob.glob(os.path.join(skill_dir, "scripts", "*"))):
-        if not sp.endswith((".py", ".sh")):
-            continue
-        try:
-            raw = io.open(sp, encoding="utf-8", errors="ignore").read()
-        except (OSError, UnicodeDecodeError):
-            continue
-
-        if sp.endswith(".py") and not compile_failed:
+    sdir = os.path.join(skill_dir, "scripts")
+    if os.path.isdir(sdir):
+        for f in sorted(os.listdir(sdir)):
+            if not f.endswith((".py", ".sh")):
+                continue
+            sp = os.path.join(sdir, f)
             try:
-                compile(raw, sp, "exec")
-            except Exception:
-                score -= 1
-                findings.append("%s does not compile" % os.path.basename(sp))
-                compile_failed = True
+                raw = io.open(sp, encoding="utf-8", errors="ignore").read()
+            except (OSError, UnicodeDecodeError):
+                continue
 
-        # Performance optimization: list comprehension is faster than generator expression in join()
-        code = "\n".join([l for l in raw.splitlines() if not l.lstrip().startswith("#")])
-        if GUARD.search(code):
-            continue
-        # `rm -rf "$VAR"` on a mktemp dir under `set -u` is the standard safe
-        # cleanup idiom; flagging it teaches people to ignore this check.
-        safe_tmp = "mktemp" in code and re.search(r"set\s+-[a-z]*u", code)
-        for rx, lbl in DESTRUCTIVE:
-            if rx.search(code) and not (lbl == "rm -rf" and safe_tmp):
-                hits.append("%s in %s" % (lbl, os.path.basename(sp)))
+            if sp.endswith(".py") and not compile_failed:
+                try:
+                    compile(raw, sp, "exec")
+                except Exception:
+                    score -= 1
+                    findings.append("%s does not compile" % f)
+                    compile_failed = True
+
+            # Performance optimization: list comprehension is faster than generator expression in join()
+            code = "\n".join([l for l in raw.splitlines() if not l.lstrip().startswith("#")])
+            if GUARD.search(code):
+                continue
+            # `rm -rf "$VAR"` on a mktemp dir under `set -u` is the standard safe
+            # cleanup idiom; flagging it teaches people to ignore this check.
+            safe_tmp = "mktemp" in code and re.search(r"set\s+-[a-z]*u", code)
+            for rx, lbl in DESTRUCTIVE:
+                if rx.search(code) and not (lbl == "rm -rf" and safe_tmp):
+                    hits.append("%s in %s" % (lbl, f))
     if hits:
         score -= 2; findings.append("unguarded " + "; ".join(sorted(set(hits))))
 
-    imp = check_module_scope_imports(os.path.join(skill_dir, "scripts"))
+    imp = check_module_scope_imports(sdir)
     if imp:
         score -= 1
         findings.append("module-scope 3rd-party import (breaks --help without deps): "
@@ -657,10 +674,9 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
     # ── D1: Frontmatter ──
     d1 = 5
     try:
-        import yaml
         parts = content.split("---")
         if len(parts) >= 3:
-            fm = yaml.safe_load(parts[1]) or {}
+            fm = (yaml.safe_load(parts[1]) if yaml else {}) or {}
         else:
             fm = {}
             d1 -= 2
