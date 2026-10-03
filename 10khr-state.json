@@ -1,13 +1,22 @@
 {
-  "last_run": "2026-09-29T18:27:32+00:00",
-  "last_target": "ocas-finch",
-  "last_score_before": 43,
-  "last_score_after": 50,
+  "last_run": "2026-10-03T05:57:00+00:00",
+  "last_target": "ocas-custodian",
+  "last_score_before": 47,
+  "last_score_after": 49,
   "skills_improved_this_session": [
-    "ocas-finch"
+    "ocas-custodian"
   ],
-  "skills_improved": 26,
+  "skills_improved": 28,
   "skill_history": [
+    {
+      "skill": "ocas-custodian",
+      "score_before": "47/50 heuristic. Manual rubric: D1=5, D2=5, D3=3 [SKILL.md 63,196 chars / 15,799 approx tokens against a 5,000-token budget; ## Critical Pitfalls alone was 41,379 chars = 66% of the file], D4=4 [same overage], D5=5, D6=5, D7=5, D8=5, D9=5, D10=5.",
+      "score_after": "49/50 heuristic (D1 5, D2 5, D3 4, D4-D10 5). D3 cannot reach 5/5 on this scorer: it computes approx_tokens as len(whole file)/4, so the 1,211-char frontmatter that D1 mandates counts against the D4/D3 5,000 budget while the body is only ~3,600. I did not delete declared frontmatter to game it. Verified: 37/37 SKILL.md pointers resolve on disk, frontmatter parses with all required keys, 25/25 scripts exit 0 on --help with no side effects, control suite 24/24 green, real issues.jsonl md5 byte-identical.",
+      "fixes": "D8/D10 (the substantive one): SKILL.md instructed every issues.jsonl append to go through scripts/append_issue_row.py -- a script that has never existed. Built it with --help, --dry-run, exit codes 0/2/3/4, and a delta derived from the open filter as written rather than a hand-maintained kind table. Then built references/append_issue_row_control.py (24 arms on a throwaway store) and the FIRST control run FAILED on the reopen case: the rule '0 for any superseding row' is wrong when an open row supersedes the last row of an already-CLOSED issue, where the open count genuinely returns to +1. Corrected to is_open(this_row) - is_open(previous_last_row), which is the filter applied twice with no special cases, and corrected the same wrong rule in SKILL.md's inline text. This is the third instance of the 'control that exists but is invoked by nothing' pattern in this skill's own history (custodian_sweep.py, the env-parity probe, and now this), and the first one documented as already done. D3/D4: three verbatim extractions -- Critical Pitfalls (41,356 chars) to references/measurement-pitfalls.md with a theme table and TOC, escalation lessons (6,155) to references/escalation-execution-lessons.md, the scan-surface block (2,002) to references/scan-surface-is-a-plugin-tool.md -- plus the per-script inventory into references/using-script.md, which already carried the usage surface. SKILL.md 63,196 -> 17,542 chars, 305 -> 281 lines. Also fixed a live self-contradiction: Operational Hints read as though `hermes cron edit` does not exist, which the escalation lessons and the 2026-10-02 user_gated falsification both say it does.",
+      "grounded": "manual+on-disk+live-help-probes-on-all-25-scripts+24-arm-control-suite+YAML-and-pointer-integrity+md5-proof-that-the-real-store-was-untouched",
+      "at": "2026-10-03T05:57:00+00:00",
+      "note": "Target selection: every skill at 44-46 in the ranking is UNMODIFIED since last_run (2026-10-02T18:17Z), so the >=44 exemption applied to all of them; ocas-custodian at 47/50 was the lowest that qualified. Only 6 SKILL.md files library-wide have mtime after last_run, and the next lowest among those is 47. Two process notes. (a) --report-only rewrites last_run to now, which would have made every skill read as modified; I stat'd mtimes directly and read the pre-existing last_run from the state file before touching the runner. (b) The scorer's approx_tokens = len(file)/4 is unchanged from what produced the 47, so the before/after comparison is apples-to-apples on the same function. D3's ceiling is a scorer artifact, not a skill defect: 1,211 of the 17,542 chars are frontmatter that D1 requires. Reaching a literal 50 would mean deleting declared metadata, which breaks the real rule, so I stopped at 49 and said so."
+    },
     {
       "skill": "ocas-finch",
       "score_before": "43/50 heuristic. Manual rubric: D1=5, D2=5, D3=3 [a 33,203-char 'Scanning gotchas' block was 62% of the file \u2014 43 dated trap narratives inline, none of them present in the references they cite], D4=4 [310 lines but 13,442 approx tokens, over the 5,000 budget], D5=5, D6=5, D7=5, D8=1 [four real defects: the skill's own unittest suite FAILED, unguarded shutil.rmtree in 3 test files, module-scope `google` imports in 3 watchers, and --help side effects], D9=5, D10=5.",
@@ -248,6 +257,22 @@
         "D9: verified both scripts --help exit 0 (existing, was false negative in heuristic)"
       ],
       "after": "50/50 manual rubric (all 10 dims 5/5; on-disk: 188 lines, 3468 tokens, all refs resolve, 'When NOT to Use' present, D6 rationale present, scripts --help exit 0)"
+    },
+    {
+      "skill": "util-web-deployment",
+      "score_before": "44/50 in the live ranking (46 by direct score_skill(): D1=5 D2=5 D3=3 D4=4 D5=5 D6=5 D7=5 D8=4 D9=5 D10=5; 347 lines, 6010 approx tokens, 0 dead refs, both scripts passing --help). Manual rubric found one further defect the scorer cannot see: the 'Credential-poisoned browser tool' section existed TWICE, verbatim, in different parts of the file.",
+      "score_after": "49/50 heuristic (D3 3->5, D4 4->5; all others already 5). D8=4 is the heuristic ceiling: check_correctness() returns 4 for any skill with a references/ dir and only ever deducts, so no skill can score 50 on D8. Verified on-disk: 208 lines, 3332 approx tokens, 0 dead refs, 0 unmapped files, 0 broken TOC anchors, both scripts --help exit 0, all 19 original error rows accounted for exactly once.",
+      "fixes": [
+        "D3/D4: extracted four sections into references/ -- Cloudflare Workers deployment (wrangler.toml shape, 6-step deploy workflow, Workers-side MCP JSON-RPC pattern, CF-to-CF 525) -> references/cloudflare-workers-deployment.md; dashboard exposure + cf-vs-wrangler CLI -> references/dashboard-and-cf-cli.md; the dev-server/testing discipline and the stale-dist pitfall -> references/local-dev-and-testing.md; the 14 non-inline Error Handling rows -> references/error-handling.md, with the 5 app-specific ones split again into references/project-specific-troubleshooting.md.",
+        "D3: removed the duplicated 'Credential-poisoned browser tool' section (was present twice verbatim). Collapsed the 8-item VPS Gotchas highlight list to the 3 highest-value items, keeping the D3/p5 material in the gotchas reference. Removed the two per-section support tables now subsumed by the master Support Files map.",
+        "D8/D4: replaced the trailing 2-line 'Support Files' stub with a master map covering all 22 references/templates/scripts with conditional 'When to read' language. scripts/verify_cf_token.py was previously UNMAPPED -- no file cited it. Every on-disk file is now mapped and every cited path resolves.",
+        "D4: inserted tables of contents into the 3 references over 100 lines that lacked one (book-deploy.md, d3-interaction-model.md, vps-mcp-deployment.md); all 12 generated anchors verified to resolve.",
+        "Corrected a stale count ('Full table of 14' -> 'The other nine') and a wrong port (wrangler dev 8787 -> 8788) introduced during the extraction.",
+        "No D9 changes needed: refresh-snapshot.sh and verify_cf_token.py both already exit 0 on --help, probed live rather than assumed."
+      ],
+      "grounded": "manual+on-disk+live-help-probes+error-row-reconciliation-against-backup+TOC-anchor-validation+yaml-frontmatter-parse",
+      "at": "2026-10-02T18:17:04.532649+00:00",
+      "note": "Skip condition evaluated per task step 3. The ranking's nominal lowest was util-hermes-ops (44, mtime 2026-09-27, before last_run 2026-09-29) and util-warmhands (44, mtime 2026-09-22) -- both unmodified at >=44, so skipped. util-web-deployment (44, mtime 2026-10-01 20:05, AFTER last_run) required grinding and was the real target. Two process notes about my own tooling, both the same class as prior runs: (a) --report-only rewrites last_run to now, which would have made every skill read as modified, so I imported score_skill() directly instead of walking mtimes against state. (b) I ran a bulk table-split script that mis-parsed the markdown header row, wrote a duplicated header into the reference and dropped the inline rows from SKILL.md entirely -- caught only because I diffed the error rows against the pre-edit backup rather than trusting the script's own success message. 19/19 rows reconciled, 0 lost, 0 duplicated across files. Third run running, the ordering that catches these is: snapshot before editing, diff after, on the CONTENT and not on the tool's exit code. Also note execute_code is blocked in cron mode, so every probe ran as a file through python3."
     }
   ],
   "current_target": "util-github",
