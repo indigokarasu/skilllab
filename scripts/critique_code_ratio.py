@@ -18,9 +18,12 @@ import sys
 import json
 
 
-def measure_code_ratio(path: str) -> dict:
-    with open(path) as f:
-        lines = f.read().split("\n")
+def measure_code_ratio(path: str, text: str = None) -> dict:
+    """Measure code ratio of a SKILL.md file. Accepts optional pre-read `text` to avoid disk I/O."""
+    if text is None:
+        with open(path) as f:
+            text = f.read()
+    lines = text.split("\n")
 
     in_block = False
     code_lines = 0

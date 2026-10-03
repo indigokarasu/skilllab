@@ -100,10 +100,10 @@ def ondisk_check(skill_name, skill_path, runner):
     # D3: code ratio + line count (line count tells us if it's the 451-500 proxy)
     # Performance optimization: In-memory module import and function invocation of
     # critique_code_ratio.measure_code_ratio avoids spawning a python interpreter subprocess
-    # for every skill verified (~50ms -> <0.1ms per skill).
+    # for every skill verified (~50ms -> <0.1ms per skill). Passing pre-read `content` avoids redundant disk read.
     try:
         cr_mod = _get_code_ratio_mod()
-        r = cr_mod.measure_code_ratio(skill_path)
+        r = cr_mod.measure_code_ratio(skill_path, text=content)
         out["D3"] = f"{r['status']} ({r['ratio']}%)"
     except Exception as e:
         out["D3"] = f"ERR {e}"
