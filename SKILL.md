@@ -1,5 +1,5 @@
 ---
-warning: 'FALSE TRIGGER RISK: Has had 86% false trigger rate on interactive loads (19/22 auto). This skill handles skill library maintenance — audit, merge, rename, delete, consolidate. Do NOT load for routine skill queries, documentation lookups, or when the task is not explicitly about skill library management. Updated 2026-09-25: rate increased from 73% (16/22).'
+warning: "FALSE TRIGGER RISK: rate NOT-MEASURED as a false-trigger rate. Corrected 2026-10-03: the prior figure counted AUTO REACH as false triggers, and read the auto count off skill_usage_log.user_prompted, which disagrees with 'a real user turn asked for this' on ~48% of resolvable loads. Measured 7d auto-reach (reached without the skill being named -- NOT the false-trigger rate): 5/29. Auto-reach alone is not a false trigger: a skill reached mid-work on a valid request is correct behaviour. This skill handles skill LIBRARY maintenance -- audit, merge, rename, delete, consolidate. Do NOT load for a single skill's own scripts or for writing arbitrary code unrelated to the skill library."
 name: ocas-skilllab
 license: MIT
 description: >

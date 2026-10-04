@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+
+try:
+    import yaml  # noqa: F401
+except ImportError:
+    # Re-exec under venv python if yaml missing — avoids false D1 gaps
+    import os, sys
+    venv_py = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'hermes-agent', 'venv', 'bin', 'python3')
+    if os.path.exists(venv_py):
+        os.execv(venv_py, [venv_py] + sys.argv)
+    else:
+        raise
+
 """
 10khr_cron_verify.py — cron-safe eligibility + 5-dimension on-disk verification harness.
 
