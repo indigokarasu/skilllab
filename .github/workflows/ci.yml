@@ -15,7 +15,12 @@ jobs:
       - name: Run unit tests
         env:
           PYTHONPATH: scripts
-        run: python3 -m unittest discover -s tests
+        # 10khr_cron_verify.py needs pyyaml for its D1 frontmatter check. The
+        # module now degrades to SKIP without it, but installing it keeps D1 a
+        # real assertion instead of a permanent no-op.
+        run: |
+          python3 -m pip install --quiet --upgrade pyyaml
+          python3 -m unittest discover -s tests
       - name: Verify every script answers --help (D9)
         run: |
           set -e

@@ -3,13 +3,21 @@
 try:
     import yaml  # noqa: F401
 except ImportError:
-    # Re-exec under venv python if yaml missing — avoids false D1 gaps
+    # Re-exec under venv python if yaml missing — avoids false D1 gaps.
+    # If there is no venv (CI runner, sandbox, any non-host interpreter), DO NOT
+    # raise: this module is imported by the unit tests and its --help path, and a
+    # module-scope ImportError made both fail with ModuleNotFoundError before any
+    # assertion ran. yaml is only needed by the D1 check, which already degrades
+    # gracefully; CI installs pyyaml so D1 stays meaningful there.
     import os, sys
     venv_py = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'hermes-agent', 'venv', 'bin', 'python3')
-    if os.path.exists(venv_py):
+    if os.path.exists(venv_py) and os.environ.get('SKILLLAB_NO_REEXEC') != '1':
         os.execv(venv_py, [venv_py] + sys.argv)
-    else:
-        raise
+
+try:
+    import yaml as _yaml
+except ImportError:
+    _yaml = None  # D1 degrades to SKIP; nothing else needs yaml
 
 """
 10khr_cron_verify.py — cron-safe eligibility + 5-dimension on-disk verification harness.
@@ -101,13 +109,15 @@ def ondisk_check(skill_name, skill_path, runner):
     out = {}
 
     # D1: frontmatter category
-    try:
-        import yaml
-        fm = yaml.safe_load(content.split("---")[1]) or {}
-        cat = fm.get("metadata", {}).get("hermes", {}).get("category")
-        out["D1"] = "OK" if cat else "MISSING category"
-    except Exception as e:
-        out["D1"] = f"YAML ERR {e}"
+    if _yaml is None:
+        out["D1"] = "SKIP (no pyyaml in this interpreter)"
+    else:
+        try:
+            fm = _yaml.safe_load(content.split("---")[1]) or {}
+            cat = fm.get("metadata", {}).get("hermes", {}).get("category")
+            out["D1"] = "OK" if cat else "MISSING category"
+        except Exception as e:
+            out["D1"] = f"YAML ERR {e}"
 
     # D3: code ratio + line count (line count tells us if it's the 451-500 proxy)
     # Performance optimization: In-memory module import and function invocation of
