@@ -267,6 +267,57 @@ class TestSkillDirectoryPruning(unittest.TestCase):
 class TestCronVerify(unittest.TestCase):
     """Unit tests for 10khr_cron_verify.py."""
 
+    def test_import_survives_missing_pyyaml(self):
+        """Regression: a module-scope `import yaml` raised ModuleNotFoundError on
+        CI (no venv to re-exec into), which failed the whole test module at import
+        time before a single assertion ran. Re-import the module with yaml blocked
+        and assert it loads, and that D1 degrades instead of exploding."""
+        import importlib.util as _ilu
+
+        class _YamlBlocker:
+            """A meta_path finder that makes `import yaml` fail the way a runner
+            without pyyaml does. Returning None is NOT enough — the import
+            system would fall through to the next finder and succeed anyway."""
+
+            def find_spec(self, name, path=None, target=None):
+                if name == "yaml" or name.startswith("yaml."):
+                    raise ModuleNotFoundError(f"No module named {name!r}", name=name)
+                return None  # defer to every other finder
+
+        blocker = _YamlBlocker()
+        spec = _ilu.spec_from_file_location(
+            "cron_verify_noyaml", os.path.join(SCRIPTS, "10khr_cron_verify.py"))
+        mod = _ilu.module_from_spec(spec)
+        saved = {k: v for k, v in sys.modules.items() if k == "yaml" or k.startswith("yaml.")}
+        for k in saved:
+            del sys.modules[k]
+        sys.meta_path.insert(0, blocker)
+        try:
+            env_no_reexec = os.environ.get("SKILLLAB_NO_REEXEC")
+            os.environ["SKILLLAB_NO_REEXEC"] = "1"  # never exec a host venv
+            try:
+                spec.loader.exec_module(mod)  # the failure was HERE
+            finally:
+                if env_no_reexec is None:
+                    os.environ.pop("SKILLLAB_NO_REEXEC", None)
+                else:
+                    os.environ["SKILLLAB_NO_REEXEC"] = env_no_reexec
+        finally:
+            sys.meta_path.remove(blocker)
+            sys.modules.update(saved)
+
+        self.assertIsNone(mod._yaml)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_md = os.path.join(tmpdir, "SKILL.md")
+            with open(skill_md, "w") as f:
+                f.write("---\nname: t\ndescription: d\n---\n# T\n- [ ] c\n")
+            chk = mod.ondisk_check("t", skill_md, runner)
+            self.assertIn("SKIP", chk["D1"])
+            # D3/D5 must still be real assertions, not silently skipped.
+            self.assertTrue(chk.get("D3", "").startswith("pass"))
+            self.assertEqual(chk.get("D5"), "OK")
+
     def test_ondisk_check(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             skill_md = os.path.join(tmpdir, "SKILL.md")
@@ -285,7 +336,14 @@ class TestCronVerify(unittest.TestCase):
                 f.write(content)
 
             chk = cron_verify.ondisk_check("test-skill", skill_md, runner)
-            self.assertTrue(chk.get("D1") == "OK" or "YAML ERR" in chk.get("D1", ""))
+            # "SKIP" is the third legitimate outcome: the module must import on an
+            # interpreter with no pyyaml (CI, sandbox), degrading D1 instead of
+            # raising. With pyyaml present D1 is a real OK/YAML ERR assertion.
+            self.assertTrue(
+                chk.get("D1") == "OK"
+                or "YAML ERR" in chk.get("D1", "")
+                or "SKIP" in chk.get("D1", "")
+            )
             self.assertTrue(chk.get("D3", "").startswith("pass"))
             self.assertEqual(chk.get("D5"), "OK")
             self.assertIn("wc_lines", chk)
