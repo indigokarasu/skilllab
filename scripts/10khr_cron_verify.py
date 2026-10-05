@@ -136,6 +136,7 @@ def ondisk_check(skill_name, skill_path, runner):
     # Prune non-skill/heavy subdirectories (.git, .venv, node_modules, __pycache__, .archive) for fast traversal.
     has_cb = "- [ ]" in content
     if not has_cb:
+        skill_fn = os.path.basename(skill_path)
         for root, dirs, files in os.walk(d):
             dirs[:] = [
                 d for d in dirs
@@ -143,6 +144,9 @@ def ondisk_check(skill_name, skill_path, runner):
             ]
             for fn in files:
                 if not fn.endswith(".md"):
+                    continue
+                # Performance optimization: Skip SKILL.md since its content was already checked above
+                if root == d and fn == skill_fn:
                     continue
                 try:
                     with open(os.path.join(root, fn), encoding="utf-8", errors="ignore") as f:

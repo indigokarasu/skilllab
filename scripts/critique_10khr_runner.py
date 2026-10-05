@@ -232,6 +232,7 @@ _FLAG_SAFE_SH = re.compile(
 _CLI_MAIN_DEF = re.compile(r"\bdef main\s*\(")
 _CLI_MAIN_GUARD = re.compile(r"if\s+__name__\s*==\s*[\"']__main__[\"']")
 _TEST_DEF = re.compile(r"\bdef test_\s*\(")
+_ARGV_HELP_RE = re.compile(r"argv\[1:\][^\n]*--help|--help[^\n]*argv")
 
 
 def _outbound_capable(name, src):
@@ -267,11 +268,15 @@ def _is_test_entrypoint(src: str) -> bool:
 
 
 def _flag_safe(name, src):
-    """Does it handle --help before acting? (static, no execution)"""
+    """Does it handle --help before acting? (static, no execution)
+
+    Performance optimization: Precompiled _ARGV_HELP_RE regex and src.partition("\n\n")[0]
+    avoid regex re-compilation and unnecessary full list allocations.
+    """
     if name.endswith(".sh"):
         return bool(_FLAG_SAFE_SH.search(src))
-    return bool(_FLAG_SAFE_PY.search(src)) or "--help" in src.split("\n\n")[0] \
-        or bool(re.search(r"argv\[1:\][^\n]*--help|--help[^\n]*argv", src))
+    return bool(_FLAG_SAFE_PY.search(src)) or "--help" in src.partition("\n\n")[0] \
+        or bool(_ARGV_HELP_RE.search(src))
 
 
 def check_scripts_help(script_dir, execute=True):
@@ -323,13 +328,18 @@ def check_scripts_help(script_dir, execute=True):
     return ok, broken, len(scripts)
 
 
+# Module-level cached stdlib_module_names set to eliminate try/except AttributeError overhead per check
+_STDLIB_MODULE_NAMES = getattr(sys, "stdlib_module_names", None)
+
+
 def _is_stdlib_module(base):
-    """Canonical stdlib membership (sys.stdlib_module_names), regex as fallback."""
-    try:
-        if base in sys.stdlib_module_names:
-            return True
-    except AttributeError:
-        pass
+    """Canonical stdlib membership (sys.stdlib_module_names), regex as fallback.
+
+    Performance optimization: module-scoped _STDLIB_MODULE_NAMES set lookup
+    bypasses AttributeError exception handling on every call.
+    """
+    if _STDLIB_MODULE_NAMES is not None:
+        return base in _STDLIB_MODULE_NAMES
     return bool(STDLIB_OK.match(base))
 
 
@@ -371,8 +381,14 @@ def check_module_scope_imports(script_dir):
     if not os.path.isdir(script_dir):
         return []
     offenders = []
-    # Performance optimization: os.listdir is faster than glob.glob and avoids pattern init overhead
-    for f in sorted(os.listdir(script_dir)):
+    # Performance optimization: Caching dir_files as a set reduces O(imports) os.path.exists
+    # stat syscalls for sibling module lookups to O(1) set membership checks.
+    try:
+        dir_files = set(os.listdir(script_dir))
+    except OSError:
+        return []
+
+    for f in sorted(dir_files):
         if not f.endswith(".py"):
             continue
         sp = os.path.join(script_dir, f)
@@ -385,16 +401,16 @@ def check_module_scope_imports(script_dir):
             for base in bases:
                 if _is_stdlib_module(base):
                     continue
-                sib_py = os.path.join(script_dir, base + ".py")
-                sib_pkg = os.path.join(script_dir, base, "__init__.py")
-                if os.path.exists(sib_py) or os.path.exists(sib_pkg):
+                sib_py = base + ".py"
+                sib_pkg_init = os.path.join(base, "__init__.py")
+                if sib_py in dir_files or sib_pkg_init in dir_files or os.path.exists(os.path.join(script_dir, sib_pkg_init)):
                     if base in seen:
                         continue              # already vetted from this entry point
                     if depth >= 4:
                         return base           # chain too deep to vet — keep flagged
                     seen.add(base)
-                    sub = first_absent(
-                        sib_py if os.path.exists(sib_py) else sib_pkg, depth + 1)
+                    target = os.path.join(script_dir, sib_py) if sib_py in dir_files else os.path.join(script_dir, sib_pkg_init)
+                    sub = first_absent(target, depth + 1)
                     if sub:
                         return sub
                     continue
