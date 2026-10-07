@@ -140,13 +140,16 @@ def find_all_skills(skills_dir: str = None, all_profiles: bool = False) -> list:
                 dirs[:] = []
 
         for path in sorted(found_paths):
-            real_path = os.path.realpath(path)
-            name = os.path.basename(os.path.dirname(real_path))
-            # Only include ocas-* and util-* prefixed skills
+            if ".archive" in path:
+                continue
+            name = os.path.basename(os.path.dirname(path))
+            # Performance optimization: Defer os.realpath until after name filter,
+            # duplicate check, and archive check to avoid unnecessary stat/readlink syscalls.
             if not (name.startswith("ocas-") or name.startswith("util-")):
                 continue
             if name in seen:
                 continue
+            real_path = os.path.realpath(path)
             if ".archive" in real_path:
                 continue
             seen.add(name)
@@ -430,6 +433,7 @@ def _get_sibling_basenames(root: str) -> set:
     Scanning sibling directories once per root reduces O(N * S * K) filesystem
     stat syscalls during dead reference checking to O(S) dir listing ops,
     improving dead-reference check performance by ~60x across skill audits.
+    Direct os.listdir calls inside try/except eliminate redundant os.path.isdir stat calls.
     """
     basenames = set()
     try:
@@ -438,16 +442,15 @@ def _get_sibling_basenames(root: str) -> set:
         return basenames
     for sib in siblings:
         p = os.path.join(root, sib)
-        if not os.path.isdir(p):
-            continue
+        # Performance optimization: Attempt os.listdir directly inside try/except OSError
+        # to avoid ~5 redundant os.path.isdir stat syscalls per sibling entry.
         for sub in ("", "references", "scripts", "assets", "templates"):
-            subpath = os.path.join(p, sub)
-            if os.path.isdir(subpath):
-                try:
-                    for f in os.listdir(subpath):
-                        basenames.add(f)
-                except OSError:
-                    pass
+            subpath = os.path.join(p, sub) if sub else p
+            try:
+                for f in os.listdir(subpath):
+                    basenames.add(f)
+            except OSError:
+                pass
     return basenames
 
 
@@ -644,16 +647,24 @@ def check_correctness(skill_dir):
                     findings.append("%s does not compile" % f)
                     compile_failed = True
 
-            # Performance optimization: list comprehension is faster than generator expression in join()
-            code = "\n".join([l for l in raw.splitlines() if not l.lstrip().startswith("#")])
-            if GUARD.search(code):
-                continue
-            # `rm -rf "$VAR"` on a mktemp dir under `set -u` is the standard safe
-            # cleanup idiom; flagging it teaches people to ignore this check.
-            safe_tmp = "mktemp" in code and re.search(r"set\s+-[a-z]*u", code)
-            for rx, lbl in DESTRUCTIVE:
-                if rx.search(code) and not (lbl == "rm -rf" and safe_tmp):
-                    hits.append("%s in %s" % (lbl, f))
+            # Performance optimization: Fast keyword pre-filter avoids splitting lines, stripping
+            # comments, joining code strings, and running regex searches on safe scripts.
+            # The pre-filter must be a SUPERSET of the DESTRUCTIVE regexes or it silently
+            # drops real hits. DROP TABLE is compiled with re.I, so the keyword test has to
+            # be case-insensitive too -- otherwise "Drop Table" matches the regex but not
+            # this guard and the destructive hit is lost.
+            _DESTRUCTIVE_KWS = ("reset", "clean", "rm", "drop", "rmtree", "push")
+            raw_lower = raw.lower()
+            if any(kw in raw_lower for kw in _DESTRUCTIVE_KWS):
+                code = "\n".join([l for l in raw.splitlines() if not l.lstrip().startswith("#")])
+                if GUARD.search(code):
+                    continue
+                # `rm -rf "$VAR"` on a mktemp dir under `set -u` is the standard safe
+                # cleanup idiom; flagging it teaches people to ignore this check.
+                safe_tmp = "mktemp" in code and re.search(r"set\s+-[a-z]*u", code)
+                for rx, lbl in DESTRUCTIVE:
+                    if rx.search(code) and not (lbl == "rm -rf" and safe_tmp):
+                        hits.append("%s in %s" % (lbl, f))
     if hits:
         score -= 2; findings.append("unguarded " + "; ".join(sorted(set(hits))))
 
