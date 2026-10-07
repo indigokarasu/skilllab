@@ -197,6 +197,19 @@ class TestRunnerHeuristics(unittest.TestCase):
                 after = f.read()
             self.assertEqual(after, before)
 
+    def test_check_correctness_destructive_case_insensitive(self):
+        import critique_10khr_runner as runner
+        for stmt in ("Drop Table users;", "dROp tABle users;", "DROP TABLE users;"):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                scripts_dir = os.path.join(tmpdir, "scripts")
+                os.makedirs(scripts_dir)
+                with open(os.path.join(scripts_dir, "bad.py"), "w") as f:
+                    f.write(f'cur.execute("{stmt}")\n')
+
+                score, findings = runner.check_correctness(tmpdir)
+                has_drop = any("DROP TABLE" in f for f in findings)
+                self.assertTrue(has_drop, f"Failed to catch destructive statement: {stmt!r} (findings: {findings})")
+
     def test_ref_resolves_and_sibling_cache(self):
         import critique_10khr_runner as runner
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -1,3 +1,7 @@
+## 2026-10-20 - Direct os.listdir with Exception Handling Over os.path.isdir Pre-Checks
+**Learning:** Pre-checking `os.path.isdir()` before calling `os.listdir()` issues unnecessary `stat` system calls. In loops scanning known subdirectories (e.g. `references`, `scripts`, `assets`), calling `os.listdir()` directly inside a `try...except OSError` block relies on the underlying filesystem syscall failure (e.g. `ENOTDIR` or `ENOENT`), eliminating ~5 redundant `stat` syscalls per directory entry.
+**Action:** Replace `if os.path.isdir(path): for f in os.listdir(path)` with direct `try: for f in os.listdir(path)` in directory traversal loops.
+
 ## 2026-10-19 - Fast-Path os.path.isdir & os.listdir Over glob.glob in Verification Loops
 **Learning:** `glob.glob()` on optional skill subdirectories (like `.github/workflows/*.yml` or `scripts/*`) initializes regex pattern matchers and attempts directory listings even when subdirectories do not exist. Guarding with `os.path.isdir()` and using `os.listdir()` completely skips missing subdirectories without glob pattern matching overhead.
 **Action:** Replace `glob.glob()` in batch verification loops with `os.path.isdir()` checks and `os.listdir()` iterations.
