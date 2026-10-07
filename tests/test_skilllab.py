@@ -375,5 +375,34 @@ class TestScriptHelp(unittest.TestCase):
         self.assertEqual(broken, [])
 
 
+class TestDestructivePreFilter(unittest.TestCase):
+    """The DESTRUCTIVE keyword pre-filter must be a SUPERSET of the regexes it gates.
+
+    Regression guard: DROP TABLE is compiled with re.I, so a case-sensitive
+    pre-filter silently drops title/mixed-case hits and the destructive finding
+    is lost (check_correctness then reports the skill clean).
+    """
+
+    def _probe(self, script_body):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.makedirs(os.path.join(tmpdir, "scripts"))
+            with open(os.path.join(tmpdir, "scripts", "bad.py"), "w") as f:
+                f.write(script_body)
+            _score, findings = runner.check_correctness(tmpdir)
+            return " ".join(findings)
+
+    def test_title_case_drop_table_flagged(self):
+        findings = self._probe('cur.execute("Drop Table users")\n')
+        self.assertIn("DROP TABLE", findings)
+
+    def test_mixed_case_drop_table_flagged(self):
+        findings = self._probe('cur.execute("dRoP TABLE accounts")\n')
+        self.assertIn("DROP TABLE", findings)
+
+    def test_uppercase_drop_table_flagged(self):
+        findings = self._probe('cur.execute("DROP TABLE sessions")\n')
+        self.assertIn("DROP TABLE", findings)
+
+
 if __name__ == "__main__":
     unittest.main()

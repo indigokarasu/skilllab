@@ -649,8 +649,13 @@ def check_correctness(skill_dir):
 
             # Performance optimization: Fast keyword pre-filter avoids splitting lines, stripping
             # comments, joining code strings, and running regex searches on safe scripts.
-            _DESTRUCTIVE_KWS = ("reset", "clean", "rm", "DROP", "drop", "rmtree", "push")
-            if any(kw in raw for kw in _DESTRUCTIVE_KWS):
+            # The pre-filter must be a SUPERSET of the DESTRUCTIVE regexes or it silently
+            # drops real hits. DROP TABLE is compiled with re.I, so the keyword test has to
+            # be case-insensitive too -- otherwise "Drop Table" matches the regex but not
+            # this guard and the destructive hit is lost.
+            _DESTRUCTIVE_KWS = ("reset", "clean", "rm", "drop", "rmtree", "push")
+            raw_lower = raw.lower()
+            if any(kw in raw_lower for kw in _DESTRUCTIVE_KWS):
                 code = "\n".join([l for l in raw.splitlines() if not l.lstrip().startswith("#")])
                 if GUARD.search(code):
                     continue
