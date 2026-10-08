@@ -201,6 +201,29 @@ def _run(cmd, cwd=None):
         return 1, str(e)
 
 
+@functools.lru_cache(maxsize=256)
+def _read_file_cached(path: str, mtime: float) -> str:
+    """Read file content cached by path and mtime using context manager to avoid file handle leaks."""
+    try:
+        with io.open(path, encoding="utf-8", errors="ignore") as f:
+            return f.read()
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+@functools.lru_cache(maxsize=256)
+def _check_script_compile(path: str, mtime: float) -> bool:
+    """Verify script compilation cached by path and mtime to eliminate redundant in-memory compiles."""
+    raw = _read_file_cached(path, mtime)
+    if not raw:
+        return True
+    try:
+        compile(raw, path, "exec")
+        return True
+    except Exception:
+        return False
+
+
 # ─── outbound-effect detection (D9 must not fire side effects) ──────────────
 # Executing --help is how D9 proves a script is inspectable. But a script that
 # treats argv[1] as its payload turns the flag INTO the payload: post.sh is
@@ -299,8 +322,9 @@ def check_scripts_help(script_dir, execute=True):
     for name in scripts:
         path = os.path.join(script_dir, name)
         try:
-            src = io.open(path, encoding="utf-8", errors="ignore").read()
-        except (OSError, UnicodeDecodeError):
+            mtime = os.path.getmtime(path)
+            src = _read_file_cached(path, mtime)
+        except OSError:
             src = ""
 
         if not src:
@@ -346,15 +370,16 @@ def _is_stdlib_module(base):
     return bool(STDLIB_OK.match(base))
 
 
-@functools.lru_cache(maxsize=128)
-def _module_scope_import_bases(path):
+@functools.lru_cache(maxsize=256)
+def _module_scope_import_bases(path, mtime=0.0):
     """Top-level module names imported at module scope of a .py file (None on parse failure).
 
-    Cached to avoid re-reading and re-parsing ASTs when inspecting sibling script imports.
+    Cached by path and mtime to avoid re-reading and re-parsing ASTs when inspecting sibling script imports.
     """
     import ast
     try:
-        tree = ast.parse(io.open(path, encoding="utf-8", errors="ignore").read())
+        src = _read_file_cached(path, mtime) if mtime else io.open(path, encoding="utf-8", errors="ignore").read()
+        tree = ast.parse(src)
     except (OSError, UnicodeDecodeError, SyntaxError):
         return None
     bases = []
@@ -398,7 +423,11 @@ def check_module_scope_imports(script_dir):
         seen = {os.path.splitext(f)[0]}
 
         def first_absent(path, depth=0):
-            bases = _module_scope_import_bases(path)
+            try:
+                mtime = os.path.getmtime(path)
+            except OSError:
+                mtime = 0.0
+            bases = _module_scope_import_bases(path, mtime)
             if bases is None:
                 return None
             for base in bases:
@@ -635,14 +664,16 @@ def check_correctness(skill_dir):
                 continue
             sp = os.path.join(sdir, f)
             try:
-                raw = io.open(sp, encoding="utf-8", errors="ignore").read()
-            except (OSError, UnicodeDecodeError):
+                mtime = os.path.getmtime(sp)
+            except OSError:
+                continue
+
+            raw = _read_file_cached(sp, mtime)
+            if not raw:
                 continue
 
             if sp.endswith(".py") and not compile_failed:
-                try:
-                    compile(raw, sp, "exec")
-                except Exception:
+                if not _check_script_compile(sp, mtime):
                     score -= 1
                     findings.append("%s does not compile" % f)
                     compile_failed = True
