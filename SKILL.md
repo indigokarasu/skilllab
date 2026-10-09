@@ -219,6 +219,7 @@ Full list (60+, plus extracted dated narratives): `references/skilllab-pitfalls.
 - **SANITIZE-BLOCKED repos silently accumulate stuck changes** — check `cron/output/skill-sync-all.log`; scrub flagged lines (host paths → `~` form, operator name → role word, fixtures → `# pii-allow`) and the next sync unblocks.
 - **Sanitize terms are substring matches — guard longer words** with `term([^a-z]|$)`; after ANY terms-file edit verify with a standalone grep — a malformed regex fails OPEN (empty hits pass everything).
 - **Terms check runs without the ALLOW_RE allowlist** — remediate refs to placeholders (`<hermes-venv>`), not by editing the term.
+- **`score_skill()` expects a file path, not a directory** — `heuristic_score.py`'s `score_skill(name, path)` opens `path` directly; passing a skill directory causes `IsADirectoryError`. Always pass `<skill_dir>/SKILL.md`.
 - Full detail: `references/skilllab-pitfalls.md`.
 
 ## 10. External Tool Evaluation & Retired Capabilities
