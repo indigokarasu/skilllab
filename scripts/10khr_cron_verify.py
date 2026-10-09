@@ -84,6 +84,9 @@ def _get_code_ratio_mod():
 
 
 def _runner_path():
+    local_path = os.path.join(os.path.dirname(__file__), "critique_10khr_runner.py")
+    if os.path.exists(local_path):
+        return local_path
     hermes_root = os.environ.get("HERMES_ROOT", os.path.expanduser("~/.hermes"))
     return os.path.join(
         hermes_root, "profiles", "indigo", "skills",
@@ -131,21 +134,22 @@ def ondisk_check(skill_name, skill_path, runner):
         out["D3"] = f"ERR {e}"
     out["wc_lines"] = len(content.split("\n"))
 
-    # D5: checklist — search the WHOLE skill dir (main + references/), because
-    # a `- [ ]` quality checklist may legitimately live in a referenced file.
-    # Prune non-skill/heavy subdirectories (.git, .venv, node_modules, __pycache__, .archive) for fast traversal.
+    # D5: checklist — search main SKILL.md + references/ directory, because
+    # a `- [ ]` quality checklist may legitimately live in a referenced support file.
+    # Performance optimization: Restrict os.walk subdirectories to 'references' only,
+    # skipping traversal into scripts/, tests/, assets/, etc.
     has_cb = "- [ ]" in content
     if not has_cb:
         skill_fn = os.path.basename(skill_path)
         for root, dirs, files in os.walk(d):
-            dirs[:] = [
-                d for d in dirs
-                if d not in ('.git', '.venv', 'node_modules', '__pycache__', '.archive')
-            ]
+            if root == d:
+                dirs[:] = [sub for sub in dirs if sub == 'references']
+            else:
+                dirs[:] = []
             for fn in files:
                 if not fn.endswith(".md"):
                     continue
-                # Performance optimization: Skip SKILL.md since its content was already checked above
+                # Skip SKILL.md since its content was already checked above
                 if root == d and fn == skill_fn:
                     continue
                 try:
@@ -159,28 +163,52 @@ def ondisk_check(skill_name, skill_path, runner):
                 break
     out["D5"] = "OK" if has_cb else "NO checklist (main or refs)"
 
-    # D9: every script --help must exit 0
+    # D9: every CLI script --help must exit 0
+    # Performance & correctness optimization: Combine _can_send safety guard with
+    # runner's non-CLI and test entrypoint filtering to avoid wasteful subprocess spawning
+    # (~50ms per non-CLI script) and eliminate false-positive failure reports on helper modules,
+    # while guaranteeing 100% safety against outbound side-effects.
     sd = os.path.join(d, "scripts")
     if os.path.isdir(sd):
         miss = []
-        for s in [f for f in os.listdir(sd) if f.endswith((".py", ".sh"))]:
+        scripts = sorted(f for f in os.listdir(sd) if f.endswith((".py", ".sh")))
+        count = len(scripts)
+        for s in scripts:
             sp = os.path.join(sd, s)
+            # 1. Outbound safety check: never execute scripts that can send/trade/post
+            if _can_send(sp):
+                continue
             try:
-                if s.endswith(".py"):
-                    if _can_send(str(sp)):
-                        continue  # outbound: do not execute
-                    rc = subprocess.run([sys.executable, sp, "--help"], input="",
-                                        capture_output=True, text=True, timeout=30).returncode
-                else:
-                    if _can_send(str(sp)):
-                        continue  # outbound: do not execute
-                    rc = subprocess.run(["bash", sp, "--help"], input="",
-                                        capture_output=True, text=True, timeout=30).returncode
+                with open(sp, encoding="utf-8", errors="ignore") as f:
+                    src = f.read()
+            except OSError:
+                src = ""
+            if not src:
+                continue
+            # 2. Skip test entrypoints and non-CLI modules to avoid slow & false-positive --help checks
+            if runner._is_test_entrypoint(src):
+                continue
+            if not runner._is_cli_entrypoint(src):
+                continue
+            if runner._outbound_capable(s, src):
+                if not runner._flag_safe(s, src):
+                    miss.append(s)
+                continue
+
+            try:
+                cmd = ["bash", sp, "--help"] if s.endswith(".sh") else [sys.executable, sp, "--help"]
+                rc = subprocess.run(cmd, input="", capture_output=True, text=True, timeout=30).returncode
             except Exception:
                 rc = -1
             if rc != 0:
-                miss.append((s, rc))
-        out["D9"] = "OK (all exit 0)" if not miss else f"MISSING --help: {miss}"
+                miss.append(s)
+
+        if count == 0:
+            out["D9"] = "N/A (no scripts)"
+        elif not miss:
+            out["D9"] = "OK (all exit 0)"
+        else:
+            out["D9"] = f"MISSING --help: {miss}"
     else:
         out["D9"] = "N/A (no scripts)"
     return out
