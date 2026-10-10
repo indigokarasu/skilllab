@@ -57,9 +57,16 @@ _OUTBOUND_SKIP = _re.compile(
     r"|curl\s+(-[A-Za-z]+\s+)*-X\s*[\"']?(POST|PUT|PATCH|DELETE)", _re.I)
 
 
-def _can_send(path):
+def _can_send(src_or_path):
+    """Outbound safety check. Accepts script source text or file path.
+
+    Performance optimization: Accepts pre-read `src` text directly to avoid
+    opening and reading script files twice in verification loops.
+    """
+    if "\n" in src_or_path or len(src_or_path) > 4096 or not os.path.exists(src_or_path):
+        return bool(_OUTBOUND_SKIP.search(src_or_path))
     try:
-        with open(path, encoding="utf-8", errors="ignore") as f:
+        with open(src_or_path, encoding="utf-8", errors="ignore") as f:
             return bool(_OUTBOUND_SKIP.search(f.read()))
     except OSError:
         return False
@@ -136,31 +143,25 @@ def ondisk_check(skill_name, skill_path, runner):
 
     # D5: checklist — search main SKILL.md + references/ directory, because
     # a `- [ ]` quality checklist may legitimately live in a referenced support file.
-    # Performance optimization: Restrict os.walk subdirectories to 'references' only,
-    # skipping traversal into scripts/, tests/, assets/, etc.
+    # Performance optimization: Use direct os.path.isdir & os.listdir on references/
+    # to avoid os.walk generator and tuple allocation overhead.
     has_cb = "- [ ]" in content
     if not has_cb:
-        skill_fn = os.path.basename(skill_path)
-        for root, dirs, files in os.walk(d):
-            if root == d:
-                dirs[:] = [sub for sub in dirs if sub == 'references']
-            else:
-                dirs[:] = []
-            for fn in files:
-                if not fn.endswith(".md"):
-                    continue
-                # Skip SKILL.md since its content was already checked above
-                if root == d and fn == skill_fn:
-                    continue
-                try:
-                    with open(os.path.join(root, fn), encoding="utf-8", errors="ignore") as f:
-                        if "- [ ]" in f.read():
-                            has_cb = True
-                            break
-                except Exception:
-                    continue
-            if has_cb:
-                break
+        refs_dir = os.path.join(d, "references")
+        if os.path.isdir(refs_dir):
+            try:
+                for fn in os.listdir(refs_dir):
+                    if not fn.endswith(".md"):
+                        continue
+                    try:
+                        with open(os.path.join(refs_dir, fn), encoding="utf-8", errors="ignore") as f:
+                            if "- [ ]" in f.read():
+                                has_cb = True
+                                break
+                    except Exception:
+                        continue
+            except OSError:
+                pass
     out["D5"] = "OK" if has_cb else "NO checklist (main or refs)"
 
     # D9: every CLI script --help must exit 0
@@ -175,15 +176,15 @@ def ondisk_check(skill_name, skill_path, runner):
         count = len(scripts)
         for s in scripts:
             sp = os.path.join(sd, s)
-            # 1. Outbound safety check: never execute scripts that can send/trade/post
-            if _can_send(sp):
-                continue
             try:
                 with open(sp, encoding="utf-8", errors="ignore") as f:
                     src = f.read()
             except OSError:
                 src = ""
             if not src:
+                continue
+            # 1. Outbound safety check: pass pre-read `src` to avoid redundant file open/read
+            if _can_send(src):
                 continue
             # 2. Skip test entrypoints and non-CLI modules to avoid slow & false-positive --help checks
             if runner._is_test_entrypoint(src):
