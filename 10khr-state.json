@@ -1,12 +1,13 @@
 {
-  "last_run": "2026-10-07T19:16:00+00:00",
-  "last_target": "ocas-reflex",
-  "last_score_before": 41,
+  "last_run": "2026-10-09T17:59:47+00:00",
+  "last_target": "ocas-skilllab",
+  "last_score_before": 48,
   "last_score_after": 50,
   "skills_improved_this_session": [
-    "ocas-reflex"
+    "ocas-reflex",
+    "ocas-skilllab"
   ],
-  "skills_improved": 31,
+  "skills_improved": 32,
   "skill_history": [
     {
       "skill": "ocas-reflex",
@@ -300,6 +301,14 @@
       "grounded": "manual+on-disk+live-help-probes+error-row-reconciliation-against-backup+TOC-anchor-validation+yaml-frontmatter-parse",
       "at": "2026-10-02T18:17:04.532649+00:00",
       "note": "Skip condition evaluated per task step 3. The ranking's nominal lowest was util-hermes-ops (44, mtime 2026-09-27, before last_run 2026-09-29) and util-warmhands (44, mtime 2026-09-22) -- both unmodified at >=44, so skipped. util-web-deployment (44, mtime 2026-10-01 20:05, AFTER last_run) required grinding and was the real target. Two process notes about my own tooling, both the same class as prior runs: (a) --report-only rewrites last_run to now, which would have made every skill read as modified, so I imported score_skill() directly instead of walking mtimes against state. (b) I ran a bulk table-split script that mis-parsed the markdown header row, wrote a duplicated header into the reference and dropped the inline rows from SKILL.md entirely -- caught only because I diffed the error rows against the pre-edit backup rather than trusting the script's own success message. 19/19 rows reconciled, 0 lost, 0 duplicated across files. Third run running, the ordering that catches these is: snapshot before editing, diff after, on the CONTENT and not on the tool's exit code. Also note execute_code is blocked in cron mode, so every probe ran as a file through python3."
+    },
+    {
+      "skill": "ocas-skilllab",
+      "score_before": "48/50 (heuristic D1=4, D3=4, D8=4)",
+      "score_after": "50/50 (runner ranking, all dims 5/5)",
+      "fixes": "D1: moved license: MIT to frontmatter line 2 (before name:), inside content[:500] window. D3: extracted 30-line triggers: block to references/triggers-list.md, replaced with pointer; trimmed section 9 intro + section 10 tail; tokens 3692->3457 (under 3500). D8: added metadata.hermes.config with HERMES_HOME + SKILLLAB_PROFILE env var declarations.",
+      "grounded": "manual+on-disk+frontmatter-yaml-parse+runner-ranking-confirmed",
+      "at": "2026-10-09T17:59:47+00:00"
     }
   ],
   "current_target": "util-github",

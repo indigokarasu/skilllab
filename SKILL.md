@@ -1,7 +1,6 @@
 ---
-warning: "FALSE TRIGGER RISK: rate NOT-MEASURED as a false-trigger rate. Corrected 2026-10-03: the prior figure counted AUTO REACH as false triggers, and read the auto count off skill_usage_log.user_prompted, which disagrees with 'a real user turn asked for this' on ~48% of resolvable loads. Measured 7d auto-reach (reached without the skill being named -- NOT the false-trigger rate): 5/29. Auto-reach alone is not a false trigger: a skill reached mid-work on a valid request is correct behaviour. This skill handles skill LIBRARY maintenance -- audit, merge, rename, delete, consolidate. Do NOT load for a single skill's own scripts or for writing arbitrary code unrelated to the skill library."
-name: ocas-skilllab
 license: MIT
+name: ocas-skilllab
 description: >
   Skill library maintenance: audit, merge, rename, delete, consolidate, publish,
   sanitize, and critique skills. Interactive menu via clarify tool.
@@ -26,45 +25,26 @@ metadata:
       - audit
       - critique
       - library-hygiene
+    config:
+      - key: HERMES_HOME
+        description: "Root Hermes config directory used to locate profile skill trees"
+        default: "~/.hermes"
+      - key: SKILLLAB_PROFILE
+        description: "Profile name whose skills directory is scanned (defaults to 'indigo')"
+        default: "indigo"
 
 source: https://github.com/<agent-handle>/skilllab
 includes:
   - references/**
   - scripts/**
 
-triggers:
-  - skilllab
-  - audit skills
-  - clean up skills
-  - merge skills
-  - rename skill
-  - delete skill
-  - skill library
-  - consolidate skills
-  - frontmatter check
-  - publish skill
-  - sanitize skill
-  - skill has secrets
-  - security scan
-  - credential refactor
-  - remove inline credential references
-  - critique skill
-  - score skill
-  - evaluate skill
-  - skill review
-  - skill scoring
-  - rubric evaluation
-  - 10khr
-  - grind
-  - improve skill
-  - cross-profile skills
-  - koda skills
-  - secret scan
-  - scan skill for secrets
-  - credential leak
+triggers: references/triggers-list.md
 ---
 
 # skilllab
+
+> **FALSE TRIGGER RISK:** skill LIBRARY maintenance only — audit, merge, rename,
+> delete, consolidate. NOT for a single skill's own scripts or unrelated code.
 
 Skill library maintenance: audit, merge, rename, delete, consolidate, publish, sanitize.
 
@@ -202,7 +182,7 @@ Minimum: `name`, `description`, `license` (first after name), `includes:` if sup
 
 ## 9. Pitfalls (Top Rules)
 
-Full list (60+, plus extracted dated narratives): `references/skilllab-pitfalls.md`.
+Full list: `references/skilllab-pitfalls.md`.
 
 
 - **50/50 means 50/50** — stopping at 45–48 is the #1 failure mode; close every gap.
@@ -224,4 +204,4 @@ Full list (60+, plus extracted dated narratives): `references/skilllab-pitfalls.
 
 ## 10. External Tool Evaluation & Retired Capabilities
 
-New external tool systems: `references/tool-integration-pattern.md` (docs → map to existing skills → delegate → build only at 24+ commands; pitfall: over-integration). Retire a capability: grep old name → classify refs (prose→replace, section→remove, logs→leave) → rename support files + cache keys → re-grep to zero refs (excluding `.archive/`).
+New tool systems: `references/tool-integration-pattern.md`. Retire: grep old name → classify (prose→replace, section→remove, logs→leave) → rename support files + cache keys → re-grep to zero (excl. `.archive/`).

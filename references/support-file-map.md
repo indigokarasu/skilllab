@@ -5,6 +5,7 @@ conditional **When to read** column so the agent loads only what each operation 
 
 | File | When to read |
 |------|-------------|
+| `references/triggers-list.md` | When reviewing slash-command discovery coverage or adding new triggers |
 | `references/skilllab-frontmatter-standards.md` | During D1 audit — full frontmatter requirements, optional fields, anti-patterns |
 | `references/skilllab-pitfalls.md` | During any skilllab operation — 60+ pitfalls covering batch replace, YAML errors, caching |
 | `references/audit-2026-05-30.md` | May 2026 audit — fixes, grep false-positive lesson, remaining issues |
