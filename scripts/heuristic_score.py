@@ -113,6 +113,9 @@ def score_skill(name, path):
     lines = content.split("\n")
     skill_dir = os.path.dirname(path)
     
+    # Performance optimization: Pre-compute cl = content.lower() once at top to eliminate redundant lowercasing string allocations
+    cl = content.lower()
+
     # D1
     d1 = 5
     try:
@@ -124,7 +127,7 @@ def score_skill(name, path):
     fm = fm or {}
     if not fm.get("name"): d1 -= 2
     if not fm.get("description"): d1 -= 2
-    if "license" not in content[:500].lower(): d1 -= 1
+    if "license" not in cl[:500]: d1 -= 1
     has_refs = os.path.isdir(os.path.join(skill_dir, "references"))
     if has_refs and "includes" not in str(fm): d1 -= 1
     
@@ -150,18 +153,17 @@ def score_skill(name, path):
     # D4
     d4 = 3
     if has_refs: d4 += 1
-    if "when to read" in content.lower(): d4 += 1
+    if "when to read" in cl: d4 += 1
     if approx_tokens < 5000: d4 = min(5, d4 + 1)
     else: d4 = max(1, d4 - 1)
     
     # D5
     d5 = 3
-    if "## pipeline" in content.lower() or "## workflow" in content.lower(): d5 += 1
-    if "## when to use" in content.lower(): d5 += 1
-    if "example" in content.lower(): d5 = min(5, d5 + 1)
+    if "## pipeline" in cl or "## workflow" in cl: d5 += 1
+    if "## when to use" in cl: d5 += 1
+    if "example" in cl: d5 = min(5, d5 + 1)
     
     # D6
-    cl = content.lower()
     d6 = 4
     if "why" in cl or "because" in cl: d6 += 1
     if "default" in cl or "override" in cl: d6 = min(5, d6)
