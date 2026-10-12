@@ -42,6 +42,8 @@ try:
 except ImportError:
     yaml = None
 
+_EXCLUDED_DIRS = {'.git', '.venv', 'node_modules', '__pycache__', '.archive'}
+
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 # Default: scan the indigo profile (active profile) recursively
@@ -126,12 +128,12 @@ def find_all_skills(skills_dir: str = None, all_profiles: bool = False) -> list:
             continue
         seen_realpaths.add(real_root)
 
-        # Fast directory traversal: use os.walk with directory pruning
+        # Fast directory traversal: use os.walk with directory pruning via set lookup
         found_paths = []
         for r, dirs, files in os.walk(root):
             dirs[:] = [
                 d for d in dirs
-                if d not in ('.git', '.venv', 'node_modules', '__pycache__', '.archive')
+                if d not in _EXCLUDED_DIRS
                 and not d.startswith('.')
             ]
             if "SKILL.md" in files:
@@ -315,9 +317,11 @@ def check_scripts_help(script_dir, execute=True):
     documented separately by the skill's support-file map.
     """
     import os
-    if not os.path.isdir(script_dir):
+    # Performance optimization: Direct os.listdir with try/except eliminates os.path.isdir stat call
+    try:
+        scripts = sorted(f for f in os.listdir(script_dir) if f.endswith((".py", ".sh")))
+    except OSError:
         return [], [], 0
-    scripts = sorted(f for f in os.listdir(script_dir) if f.endswith((".py", ".sh")))
     ok, broken = [], []
     for name in scripts:
         path = os.path.join(script_dir, name)
@@ -406,11 +410,10 @@ def check_module_scope_imports(script_dir):
       imports depart the bundle; that is checked recursively (cycle-safe).
     """
     import os
-    if not os.path.isdir(script_dir):
-        return []
     offenders = []
     # Performance optimization: Caching dir_files as a set reduces O(imports) os.path.exists
     # stat syscalls for sibling module lookups to O(1) set membership checks.
+    # Direct os.listdir with exception handling eliminates redundant os.path.isdir stat call.
     try:
         dir_files = set(os.listdir(script_dir))
     except OSError:
@@ -456,19 +459,20 @@ def check_module_scope_imports(script_dir):
 
 
 @functools.lru_cache(maxsize=128)
-def _get_sibling_basenames(root: str) -> set:
+def _get_sibling_basenames(root: str) -> frozenset:
     """Cache the set of all basenames residing in sibling skill directories.
 
     Scanning sibling directories once per root reduces O(N * S * K) filesystem
     stat syscalls during dead reference checking to O(S) dir listing ops,
     improving dead-reference check performance by ~60x across skill audits.
     Direct os.listdir calls inside try/except eliminate redundant os.path.isdir stat calls.
+    Returns frozenset to prevent cache mutations and speed up set lookups.
     """
     basenames = set()
     try:
         siblings = os.listdir(root)
     except OSError:
-        return basenames
+        return frozenset(basenames)
     for sib in siblings:
         p = os.path.join(root, sib)
         # Performance optimization: Attempt os.listdir directly inside try/except OSError
@@ -480,7 +484,7 @@ def _get_sibling_basenames(root: str) -> set:
                     basenames.add(f)
             except OSError:
                 pass
-    return basenames
+    return frozenset(basenames)
 
 
 def _ref_resolves(skill_dir, ref):
@@ -589,7 +593,7 @@ def _ref_resolves_absorbed(skill_dir, ref, text):
     return False
 
 
-def check_frontmatter_parses(skill_dir, text=None):
+def check_frontmatter_parses(skill_dir, text=None, return_meta=False):
     """Frontmatter must PARSE, not merely contain the right field names.
 
     The previous check was a regex for `name:`, which matches even when
@@ -597,15 +601,19 @@ def check_frontmatter_parses(skill_dir, text=None):
     public skills shipped that way: every field was "present", the YAML was
     invalid, and the skill would not load for anyone who installed it.
     Accepting pre-read text avoids redundant disk reads.
-    Performance optimization: precompiled regexes avoid repeated regex compilation.
+    Performance optimization: single-pass return_meta=True returns parsed
+    metadata dict alongside validation problem list to eliminate duplicate
+    yaml.safe_load() calls in score_skill loops.
     """
     problems = []
+    meta = {}
     if text is None:
         sk = os.path.join(skill_dir, "SKILL.md")
         try:
             text = io.open(sk, encoding="utf-8", errors="ignore").read()
         except OSError:
-            return ["SKILL.md unreadable"]
+            problems.append("SKILL.md unreadable")
+            return (problems, meta) if return_meta else problems
 
     if _MERGE_CONFLICT_PATTERN.search(text):
         problems.append("unresolved merge-conflict markers in SKILL.md")
@@ -613,19 +621,20 @@ def check_frontmatter_parses(skill_dir, text=None):
     m = _FRONTMATTER_BLOCK_PATTERN.match(text)
     if not m:
         problems.append("no YAML frontmatter block")
-        return problems
+        return (problems, meta) if return_meta else problems
     try:
         meta = yaml.safe_load(m.group(1)) if yaml else {}
     except Exception as e:
         problems.append("frontmatter does not parse: %s" % type(e).__name__)
-        return problems
+        return (problems, meta) if return_meta else problems
     if not isinstance(meta, dict):
         problems.append("frontmatter is not a mapping")
-        return problems
+        meta = {}
+        return (problems, meta) if return_meta else problems
     for field in ("name", "description"):
         if not meta.get(field):
             problems.append("frontmatter missing '%s'" % field)
-    return problems
+    return (problems, meta) if return_meta else problems
 
 
 def check_correctness(skill_dir):
@@ -633,9 +642,15 @@ def check_correctness(skill_dir):
     import os
     findings, score = [], 5
 
-    # Performance optimization: os.path.isdir and os.listdir avoiding glob overhead
+    # Performance optimization: Direct os.listdir with try/except eliminates os.path.isdir stat calls
     tdir = os.path.join(skill_dir, "tests")
-    if not (os.path.isdir(tdir) and any(f.startswith("test_") and f.endswith(".py") for f in os.listdir(tdir))):
+    try:
+        tfiles = os.listdir(tdir)
+        has_tests = any(f.startswith("test_") and f.endswith(".py") for f in tfiles)
+    except OSError:
+        has_tests = False
+
+    if not has_tests:
         score -= 2; findings.append("no tests")
     else:
         rc, out = _run([sys.executable, "-m", "unittest", "discover", "-s", "tests"], cwd=skill_dir)
@@ -644,7 +659,13 @@ def check_correctness(skill_dir):
             findings.append("tests FAIL: " + (out.strip().splitlines() or ["?"])[-1][:60])
 
     wf_dir = os.path.join(skill_dir, ".github", "workflows")
-    if not (os.path.isdir(wf_dir) and any(f.endswith((".yml", ".yaml")) for f in os.listdir(wf_dir))):
+    try:
+        wfiles = os.listdir(wf_dir)
+        has_ci = any(f.endswith((".yml", ".yaml")) for f in wfiles)
+    except OSError:
+        has_ci = False
+
+    if not has_ci:
         score -= 1; findings.append("no CI workflow")
 
     # Performance optimization: Single-pass script inspection using os.listdir.
@@ -653,8 +674,13 @@ def check_correctness(skill_dir):
     hits = []
     compile_failed = False
     sdir = os.path.join(skill_dir, "scripts")
-    if os.path.isdir(sdir):
-        for f in sorted(os.listdir(sdir)):
+    try:
+        sfiles = os.listdir(sdir)
+    except OSError:
+        sfiles = []
+
+    if sfiles:
+        for f in sorted(sfiles):
             if not f.endswith((".py", ".sh")):
                 continue
             sp = os.path.join(sdir, f)
@@ -675,10 +701,6 @@ def check_correctness(skill_dir):
 
             # Performance optimization: Fast keyword pre-filter avoids splitting lines, stripping
             # comments, joining code strings, and running regex searches on safe scripts.
-            # The pre-filter must be a SUPERSET of the DESTRUCTIVE regexes or it silently
-            # drops real hits. DROP TABLE is compiled with re.I, so the keyword test has to
-            # be case-insensitive too -- otherwise "Drop Table" matches the regex but not
-            # this guard and the destructive hit is lost.
             _DESTRUCTIVE_KWS = ("reset", "clean", "rm", "drop", "rmtree", "push")
             raw_lower = raw.lower()
             if any(kw in raw_lower for kw in _DESTRUCTIVE_KWS):
@@ -689,8 +711,6 @@ def check_correctness(skill_dir):
                     code = raw
                 if GUARD.search(code):
                     continue
-                # `rm -rf "$VAR"` on a mktemp dir under `set -u` is the standard safe
-                # cleanup idiom; flagging it teaches people to ignore this check.
                 safe_tmp = "mktemp" in code and re.search(r"set\s+-[a-z]*u", code)
                 for rx, lbl in DESTRUCTIVE:
                     if rx.search(code) and not (lbl == "rm -rf" and safe_tmp):
@@ -731,18 +751,17 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
 
     scores = {}
 
+    skill_dir = os.path.dirname(skill_path)
+
+    # Performance optimization: Single-pass frontmatter parsing & validation.
+    # check_frontmatter_parses with return_meta=True extracts both validation problems and parsed
+    # metadata dict in a single call, eliminating duplicate yaml.safe_load() parsing per skill.
+    _fm, fm = check_frontmatter_parses(skill_dir, text=content, return_meta=True)
+
     # ── D1: Frontmatter ──
     d1 = 5
-    try:
-        parts = content.split("---")
-        if len(parts) >= 3:
-            fm = (yaml.safe_load(parts[1]) if yaml else {}) or {}
-        else:
-            fm = {}
-            d1 -= 2
-    except Exception:
-        fm = {}
-        d1 -= 3
+    if not fm:
+        d1 -= 2
 
     if not fm.get("name"):
         d1 -= 2
@@ -750,8 +769,7 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
         d1 -= 2
     if "license" not in content_lower[:500]:
         d1 -= 1
-    skill_dir = os.path.dirname(skill_path)
-    has_refs = os.path.isdir(os.path.join(skill_dir, "references"))
+    has_refs = os.path.exists(os.path.join(skill_dir, "references"))
     if has_refs and "includes" not in str(fm):
         d1 -= 1
     scores["D1"] = max(1, d1)
@@ -835,8 +853,7 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
     # doc problem cannot dominate the safety signal in this dimension.
     # Invalid frontmatter means the skill does not load at all -- a harder
     # failure than anything else measured here, so it is not a soft deduction.
-    # Pass pre-read content to avoid redundant disk open/read operations
-    _fm = check_frontmatter_parses(skill_dir, text=content)
+    # Re-use _fm parsed during single-pass frontmatter validation above
     if _fm:
         d8 = max(0, d8 - 2)
         correctness_findings.extend(_fm)
