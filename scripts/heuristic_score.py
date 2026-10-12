@@ -33,10 +33,12 @@ def find_all_skills():
     return results
 
 def check_scripts_help(script_dir):
-    if not os.path.isdir(script_dir):
+    # Performance optimization: Direct os.listdir with try/except eliminates os.path.isdir stat call
+    try:
+        scripts = [f for f in os.listdir(script_dir)
+                   if f.endswith(('.py', '.sh')) and not f.startswith('_')]
+    except OSError:
         return 5, [], 0
-    scripts = [f for f in os.listdir(script_dir) 
-               if f.endswith(('.py', '.sh')) and not f.startswith('_')]
     if not scripts:
         return 5, [], 0
     broken = []
@@ -63,11 +65,12 @@ def check_correctness(skill_dir):
         d8 = max(0, d8 - 1)
     return d8, findings
 
-def check_frontmatter_parses(skill_dir, text=None):
+def check_frontmatter_parses(skill_dir, text=None, return_meta=False):
     """Verify frontmatter parses as valid YAML.
 
     Performance optimization: accepts pre-read `text` to eliminate redundant disk
-    open/read operations during batch skill assessment.
+    open/read operations during batch skill assessment, and optional `return_meta=True`
+    to return parsed metadata dict alongside validation status in a single pass.
     """
     if text is None:
         skill_md = os.path.join(skill_dir, "SKILL.md")
@@ -75,15 +78,16 @@ def check_frontmatter_parses(skill_dir, text=None):
             with open(skill_md) as f:
                 text = f.read()
         except OSError:
-            return False
+            return (False, {}) if return_meta else False
     parts = text.split("---")
     if len(parts) < 3:
-        return False
+        return (False, {}) if return_meta else False
     try:
         fm = yaml.safe_load(parts[1]) if yaml else {}
-        return fm is not None
+        is_valid = fm is not None
+        return (is_valid, fm if is_valid else {}) if return_meta else is_valid
     except Exception:
-        return False
+        return (False, {}) if return_meta else False
 
 def check_dead_references(skill_dir, text=None):
     """Find references/ links in SKILL.md that do not exist.
@@ -116,19 +120,20 @@ def score_skill(name, path):
     # Performance optimization: Pre-compute cl = content.lower() once at top to eliminate redundant lowercasing string allocations
     cl = content.lower()
 
+    # Performance optimization: Single-pass frontmatter parsing & validation.
+    # check_frontmatter_parses with return_meta=True extracts both validity flag and parsed
+    # metadata dict in a single call, eliminating duplicate yaml.safe_load() parsing per skill.
+    fm_valid, fm = check_frontmatter_parses(skill_dir, text=content, return_meta=True)
+    fm = fm or {}
+
     # D1
     d1 = 5
-    try:
-        parts = content.split("---")
-        fm = (yaml.safe_load(parts[1]) if yaml else {}) if len(parts) >= 3 else {}
-    except:
-        fm = {}
+    if not fm_valid:
         d1 -= 3
-    fm = fm or {}
     if not fm.get("name"): d1 -= 2
     if not fm.get("description"): d1 -= 2
     if "license" not in cl[:500]: d1 -= 1
-    has_refs = os.path.isdir(os.path.join(skill_dir, "references"))
+    has_refs = os.path.exists(os.path.join(skill_dir, "references"))
     if has_refs and "includes" not in str(fm): d1 -= 1
     
     # D2
@@ -176,7 +181,6 @@ def score_skill(name, path):
     # D8 - Pass pre-read content to check_frontmatter_parses and check_dead_references
     # to eliminate redundant disk I/O (saves 2 file open/read calls per skill).
     d8, cf = check_correctness(skill_dir)
-    fm_valid = check_frontmatter_parses(skill_dir, text=content)
     if fm_valid is False: d8 = max(0, d8 - 2)
     dead = check_dead_references(skill_dir, text=content)
     if dead: d8 = max(0, d8 - min(2, len(dead)))
