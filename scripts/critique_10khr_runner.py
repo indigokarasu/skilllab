@@ -492,15 +492,21 @@ def _ref_resolves(skill_dir, ref):
 
     Skills cross-reference each other constantly. Resolving only against
     skill_dir marks all of those dead — the false positive that makes a
-    dead-ref check worthless. Try, in order: the skill itself, the skills
-    root (handles "ocas-vibes/references/x.md" and "../other-skill/x.md"),
-    then the bare basename under any sibling skill's usual subdirs.
+    dead-ref check worthless. Try, in order: the skill itself, the cached
+    sibling basenames (O(1) in-memory set lookup), then the skills root
+    and agent root fallback paths.
     """
     # Performance optimization: normalize path upfront to avoid duplicate os.path.exists stat calls
     skill_ref = os.path.normpath(os.path.join(skill_dir, ref))
     if os.path.exists(skill_ref):
         return True
     root = os.path.dirname(os.path.abspath(skill_dir.rstrip("/")))
+    # Performance optimization: Fast O(1) in-memory check against cached sibling basenames
+    # skips unnecessary os.path.exists stat syscalls on root and agent_root paths.
+    base = os.path.basename(ref)
+    sibling_files = _get_sibling_basenames(root)
+    if base in sibling_files:
+        return True
     if os.path.exists(os.path.normpath(os.path.join(root, ref))):
         return True
     # Shared helpers live in the AGENT ROOT's scripts/ dir, one level above
@@ -508,11 +514,7 @@ def _ref_resolves(skill_dir, ref):
     agent_root = os.path.dirname(root)
     if agent_root and os.path.exists(os.path.normpath(os.path.join(agent_root, ref))):
         return True
-    base = os.path.basename(ref)
-    # Performance optimization: use cached set of sibling basenames to avoid O(skills * subdirs)
-    # filesystem stats for missing/unresolved references.
-    sibling_files = _get_sibling_basenames(root)
-    return base in sibling_files
+    return False
 
 
 # Filename TEMPLATES are not missing files: `ingest_cron_YYYYMMDD.py` is a
