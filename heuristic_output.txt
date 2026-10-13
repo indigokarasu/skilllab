@@ -1,0 +1,77 @@
+
+Rank  Skill                                        Score     Band
+---------------------------------------------------------------------------
+1     util-dreamhost                               46/50    A
+2     ocas-mentor                                  46/50    A
+3     ocas-praxis                                  46/50    A
+4     util-voice-call                              46/50    A
+5     ocas-haiku                                   46/50    A
+6     ocas-autobio                                 46/50    A
+7     util-github                                  46/50    A
+8     ocas-usercontext                             46/50    A
+9     ocas-sands                                   46/50    A
+10    ocas-dispatch                                46/50    A
+11    ocas-vesper                                  46/50    A
+12    util-warmhands                               46/50    A
+13    util-hermes-ops                              46/50    A
+14    util-imessage-ingest                         46/50    A
+15    util-headhunter                              46/50    A
+16    ocas-scout                                   46/50    A
+17    ocas-lucid                                   46/50    A
+18    ocas-voyage                                  47/50    A
+19    ocas-weave                                   47/50    A
+20    ocas-forge                                   47/50    A
+21    ocas-rally                                   47/50    A
+22    ocas-finch                                   47/50    A
+23    util-buy                                     48/50    A
+24    ocas-bower                                   48/50    A
+25    util-apibuild                                48/50    A
+26    util-rapidapi                                48/50    A
+27    util-skill-analytics                         48/50    A
+28    util-web-extract                             48/50    A
+29    util-convert                                 48/50    A
+30    ocas-vibes                                   48/50    A
+31    util-formfill                                48/50    A
+32    util-agent-swarm                             48/50    A
+33    ocas-styx                                    48/50    A
+34    ocas-spot                                    48/50    A
+35    ocas-imagine                                 49/50    A
+36    util-draw                                    49/50    A
+37    util-telegram-miniapp                        49/50    A
+38    ocas-reflex                                  49/50    A
+39    ocas-custodian                               49/50    A
+40    util-iamwrite                                49/50    A
+41    ocas-taste                                   49/50    A
+42    ocas-skilllab                                49/50    A
+43    ocas-sift                                    49/50    A
+44    ocas-inception                               49/50    A
+45    ocas-reach                                   49/50    A
+46    util-reddit                                  49/50    A
+47    ocas-genie                                   49/50    A
+48    ocas-multipass                               49/50    A
+49    ocas-look                                    49/50    A
+50    util-mask                                    49/50    A
+51    util-manage                                  49/50    A
+52    util-domain-store                            49/50    A
+53    util-web-deployment                          49/50    A
+54    ocas-fellow                                  49/50    A
+55    ocas-tasks                                   49/50    A
+
+Skills below 50/50: 55
+
+Lowest: util-dreamhost (46/50)
+Dimensions: {
+  "D1": 5,
+  "D2": 5,
+  "D3": 3,
+  "D4": 4,
+  "D5": 5,
+  "D6": 5,
+  "D7": 5,
+  "D8": 4,
+  "D9": 5,
+  "D10": 5
+}
+Lines: 455, Tokens: ~6647, Code ratio: 2.9%
+Broken scripts: []
+Dead refs: []
