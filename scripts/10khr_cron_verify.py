@@ -61,9 +61,11 @@ def _can_send(src_or_path):
     """Outbound safety check. Accepts script source text or file path.
 
     Performance optimization: Accepts pre-read `src` text directly to avoid
-    opening and reading script files twice in verification loops.
+    opening and reading script files twice in verification loops. Fast-path
+    string checks ("\n", len > 1024) detect source code immediately without
+    triggering redundant `os.path.exists` filesystem stat calls on source strings.
     """
-    if "\n" in src_or_path or len(src_or_path) > 4096 or not os.path.exists(src_or_path):
+    if "\n" in src_or_path or len(src_or_path) > 1024 or not os.path.exists(src_or_path):
         return bool(_OUTBOUND_SKIP.search(src_or_path))
     try:
         with open(src_or_path, encoding="utf-8", errors="ignore") as f:
