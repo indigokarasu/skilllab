@@ -375,6 +375,33 @@ class TestScriptHelp(unittest.TestCase):
         self.assertEqual(broken, [])
 
 
+class TestModuleScopeImports(unittest.TestCase):
+    """Test check_module_scope_imports fast-path resolution for 3rd party vs sibling imports."""
+
+    def test_check_module_scope_imports_siblings_and_third_party(self):
+        import critique_10khr_runner as runner
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # 1. Main script importing a 3rd party module, a sibling file, and a sibling package
+            main_script = os.path.join(tmpdir, "main.py")
+            with open(main_script, "w") as f:
+                f.write("import sys\nimport requests\nimport sib_mod\nimport sib_pkg\n")
+
+            # 2. Sibling file
+            sib_mod = os.path.join(tmpdir, "sib_mod.py")
+            with open(sib_mod, "w") as f:
+                f.write("x = 1\n")
+
+            # 3. Sibling package folder with __init__.py
+            pkg_dir = os.path.join(tmpdir, "sib_pkg")
+            os.makedirs(pkg_dir)
+            with open(os.path.join(pkg_dir, "__init__.py"), "w") as f:
+                f.write("y = 2\n")
+
+            offenders = runner.check_module_scope_imports(tmpdir)
+            # Only requests should be flagged as absent 3rd party import
+            self.assertEqual(offenders, ["main.py: requests"])
+
+
 class TestDestructivePreFilter(unittest.TestCase):
     """The DESTRUCTIVE keyword pre-filter must be a SUPERSET of the regexes it gates.
 

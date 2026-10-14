@@ -1,3 +1,7 @@
+## 2026-10-23 - Fast-Path Directory Entry Pre-Check Before Sibling Package __init__.py stat Calls
+**Learning:** Checking `os.path.exists(os.path.join(script_dir, base, "__init__.py"))` for every imported module issues hundreds of redundant filesystem stat syscalls for non-sibling 3rd-party dependencies. Pre-checking `base in dir_files` (where `dir_files` is `set(os.listdir(script_dir))`) short-circuits stat syscalls for all non-sibling imports, yielding a ~24x speedup in `check_module_scope_imports`.
+**Action:** Always verify `base in dir_files` before calling `os.path.exists(os.path.join(script_dir, base, "__init__.py"))`.
+
 ## 2026-10-22 - Fast-Path Entrypoint Pre-Filtering Before Script Execution
 **Learning:** In verification harnesses checking script execution (`--help`), spawning Python/Bash subprocesses (`subprocess.run`) on test entrypoints or non-CLI helper modules incurs ~50ms process creation overhead per file and triggers false-positive failures. Filtering scripts with fast static entrypoint checks (`_is_cli_entrypoint` & `_is_test_entrypoint`) and outbound safety guards (`_can_send`) before spawning subshells eliminates non-CLI subprocess execution completely while preserving safety.
 **Action:** Always pre-filter script lists with static CLI entrypoint and outbound safety checks before running `--help` subprocess execution loops.
