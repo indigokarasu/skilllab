@@ -1,3 +1,7 @@
+## 2026-10-24 - Pre-Read File Filtering in Quarantine and Sanitization Loops
+**Learning:** Opening and reading file contents into memory (`open(path).read()`) before evaluating relocation or quarantine conditions causes redundant disk I/O, memory allocations, and `UnicodeDecodeError` exceptions on non-text artifacts. Evaluating quarantine pattern matches on file names before opening files avoids unnecessary disk I/O and prevents decoding failures on binary session artifacts.
+**Action:** Always evaluate file-relocation and quarantine criteria before opening and reading file contents in file traversal loops.
+
 ## 2026-10-23 - Fast-Path Directory Entry Pre-Check Before Sibling Package __init__.py stat Calls
 **Learning:** Checking `os.path.exists(os.path.join(script_dir, base, "__init__.py"))` for every imported module issues hundreds of redundant filesystem stat syscalls for non-sibling 3rd-party dependencies. Pre-checking `base in dir_files` (where `dir_files` is `set(os.listdir(script_dir))`) short-circuits stat syscalls for all non-sibling imports, yielding a ~24x speedup in `check_module_scope_imports`.
 **Action:** Always verify `base in dir_files` before calling `os.path.exists(os.path.join(script_dir, base, "__init__.py"))`.

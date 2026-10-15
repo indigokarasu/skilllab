@@ -248,6 +248,22 @@ def sanitize_skill(name, skill_dir):
             if ext not in _SANITIZE_EXTS:
                 continue
             path = os.path.join(root, file)
+            rel = os.path.relpath(path, skill_dir)
+            counts = {}
+
+            # Fast path: quarantine session-log reference files before reading file contents to save disk I/O
+            if any(pat.search(file) for pat in _SESSION_LOG_PATTERNS):
+                os.makedirs(session_log_quarantine_dir, exist_ok=True)
+                quarantine_path = os.path.join(session_log_quarantine_dir, file)
+                try:
+                    os.replace(path, quarantine_path)
+                    counts['session_log_quarantined'] = counts.get('session_log_quarantined', 0) + 1
+                except OSError:
+                    pass
+                if counts.get('session_log_quarantined'):
+                    summary[rel] = counts
+                    continue
+
             try:
                 with open(path, 'r', encoding='utf-8') as f:
                     content = f.read()
@@ -255,8 +271,6 @@ def sanitize_skill(name, skill_dir):
                 continue
 
             original = content
-            counts = {}
-            rel = os.path.relpath(path, skill_dir)
             basename_lower = file.lower()
             is_readme = rel.lower() == 'readme.md'
 
@@ -285,19 +299,6 @@ def sanitize_skill(name, skill_dir):
                 if banned in content:
                     content = content.replace(banned, replacement)
                     counts[f'banned_tool_ref:{banned}'] = counts.get(f'banned_tool_ref:{banned}', 0) + 1
-
-            # quarantine session-log reference files
-            if any(pat.search(file) for pat in _SESSION_LOG_PATTERNS):
-                os.makedirs(session_log_quarantine_dir, exist_ok=True)
-                quarantine_path = os.path.join(session_log_quarantine_dir, file)
-                try:
-                    os.replace(path, quarantine_path)
-                    counts['session_log_quarantined'] = counts.get('session_log_quarantined', 0) + 1
-                except OSError:
-                    pass
-                if counts.get('session_log_quarantined'):
-                    summary[rel] = counts
-                    continue
 
             if content != original:
                 with open(path, 'w', encoding='utf-8') as f:
