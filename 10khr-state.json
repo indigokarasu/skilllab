@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-10-11T05:55:59.214159+00:00",
-  "last_target": "ocas-custodian",
+  "last_run": "2026-10-15T17:54:02.381715+00:00",
+  "last_target": "ocas-scout",
   "last_score_before": 49,
   "last_score_after": 50,
   "skills_improved_this_session": [
@@ -8,7 +8,7 @@
     "ocas-skilllab",
     "ocas-custodian"
   ],
-  "skills_improved": 32,
+  "skills_improved": 33,
   "skill_history": [
     {
       "skill": "ocas-reflex",
@@ -319,9 +319,28 @@
       "grounded": "manual+on-disk+frontmatter-yaml-parse+0-dead-refs+26/26-cited-files-mapped+25/25-scripts-help-exit-0+runner-ranking-confirmed+no-duplicate-lines-or-fragments",
       "at": "2026-10-11T05:55:08.016130+00:00",
       "note": "Target selection: every skill at 44-48 in the ranking (ocas-dispatch, ocas-haiku, ocas-mentor, ocas-praxis, ocas-sands, ocas-usercontext, ocas-voyage, util-apibuild, util-buy, util-dreamhost, util-hermes-ops, ...) is UNMODIFIED since last_run (2026-10-09T17:59:47Z), so the >=44 exemption applied to all of them. Only TWO SKILL.md files library-wide have mtime after last_run: ocas-skilllab (50/50) and ocas-custodian (49/50, mtime 2026-10-09 23:32:43 -0700). ocas-custodian is the lowest that qualifies, so it is the genuine target. No skill library-wide scores below 44 (checked all 55). Process note carried from prior runs: --report-only rewrites last_run to now, which would make every skill read as modified, so I read the pre-existing last_run from the state file and stat'd mtimes directly rather than walking the runner's own mutated state. The D3 ceiling here is NOT a scorer artifact this time -- unlike prior custodian runs, the file was genuinely over the token threshold with real duplicated content; the fix reduced it honestly to 3,510 tokens. execute_code is blocked in cron mode (Tirith), so every probe ran as a written file through python3."
+    },
+    {
+      "skill": "ocas-scout",
+      "score_before": "43/50 heuristic (D1=4 license position + missing metadata.hermes.config, D3=3 tokens>5000, D4=4 tokens>5000, D9=3 two test scripts flagged as no --help)",
+      "score_after": "50/50 runner heuristic (all 10 dims 5/5) + manual rubric 50/50; tests 4/4 pass; all scripts --help exit 0",
+      "fixes": [
+        "D1: moved license to front matter line 1 (fixes heuristic first-500 window), removed non-spec warning field, added metadata.hermes.config for SCOUT_SEARXNG_URL/SCOUT_OSINT_VENV/HERMES_OSINT_CACHE/HERMES_OSINT_UA/SCOUT_GITHUB_TOKEN/OPENCORPORATES_API_TOKEN/COURTLISTENER_TOKEN/SENATE_LDA_TOKEN",
+        "D3/D4: extracted Gotchas (3.2k chars), Invariants, Ontology/signal schema, full research workflow, output requirements, and source waterfall into references/gotchas.md and references/invariants.md with inline pointers; SKILL.md 286 -> 237 lines, ~5481 -> ~3311 tokens",
+        "D7: added Error Handling table (8 failure/symptom/handling rows)",
+        "D8: rewrote references/support-file-map.md with When-to-read conditional column for every bundled non-inline file; added support-file-map row to SKILL.md",
+        "D9: added --help guards to test_name_tokens.py and test_new_pipeline.py (no-op under pytest); all 20 scripts now expose --help",
+        "D5: added concrete input example under Input contract",
+        "D6: restored why/because rationale for tiered source waterfall",
+        "D8/correctness: created tests/test_smoke.py (4 unittest cases: frontmatter config, all scripts --help, cited refs exist); created missing references/self_update.md (dead ref found by smoke test)",
+        "D5: inline 11-step phase checklist under Workflow"
+      ],
+      "grounded": "manual+on-disk+runner-50/50+4/4-tests+live-help-probes+git-push",
+      "at": "2026-10-15T17:41:56.558437+00:00",
+      "note": "Target selection: util-hermes-ops (44), util-warmhands (44), ocas-dispatch (44), ocas-haiku (44), ocas-mentor (44), ocas-praxis (44), ocas-sands (44), and the remaining 44-score skills were all unmodified since last_run 2026-10-11, so skipped at >=44. ocas-scout (44 at report time, 43 by direct scorer) was modified and was the lowest that qualified. Fixed a duplicate Commands heading introduced during extraction; re-verified runner 50/50."
     }
   ],
-  "current_target": "util-github",
+  "current_target": "ocas-scout",
   "last_grind": {
     "skill": "ocas-dispatch",
     "score_before": "44/50 (manual: D3=4 [7036 tokens >5000], D4=4 [token proxy >5000], D8=1 [no tests, no CI, 4 dead refs])",
