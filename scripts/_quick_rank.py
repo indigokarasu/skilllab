@@ -32,7 +32,9 @@ def score_heuristic(skill_path):
     score = 50  # start at max
     
     # D1: frontmatter
-    fm = md.split("---")[1] if md.startswith("---") else ""
+    # Performance optimization: Limit split to maxsplit=2 to avoid splitting remainder of document
+    parts = md.split("---", 2) if md.startswith("---") else []
+    fm = parts[1] if len(parts) >= 3 else ""
     if "name:" not in fm:
         score -= 5
     if "description:" not in fm:

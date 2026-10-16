@@ -125,7 +125,10 @@ def ondisk_check(skill_name, skill_path, runner):
         out["D1"] = "SKIP (no pyyaml in this interpreter)"
     else:
         try:
-            fm = _yaml.safe_load(content.split("---")[1]) or {}
+            # Performance optimization: Limit split to maxsplit=2 to avoid allocating full doc slices
+            parts = content.split("---", 2)
+            fm = _yaml.safe_load(parts[1]) if len(parts) >= 3 else {}
+            fm = fm or {}
             cat = fm.get("metadata", {}).get("hermes", {}).get("category")
             out["D1"] = "OK" if cat else "MISSING category"
         except Exception as e:

@@ -79,7 +79,8 @@ def check_frontmatter_parses(skill_dir, text=None, return_meta=False):
                 text = f.read()
         except OSError:
             return (False, {}) if return_meta else False
-    parts = text.split("---")
+    # Performance optimization: Limit split to maxsplit=2 to avoid splitting remainder of document
+    parts = text.split("---", 2)
     if len(parts) < 3:
         return (False, {}) if return_meta else False
     try:
