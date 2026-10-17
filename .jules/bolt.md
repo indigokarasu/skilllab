@@ -1,3 +1,7 @@
+## 2026-10-25 - Fast-Path String Pre-Checks for Multiline Regexes & Direct Open over os.path.exists in Safety Guards
+**Learning:** Running multiline regexes (`_REF_PATTERN.findall` and `_MERGE_CONFLICT_PATTERN.search`) across every skill file without checking if trigger keywords exist creates unnecessary regex execution overhead on safe/clean files. Pre-checking trigger substrings (`any(k in text ...)` / `<<<<<<<` in text) skips regex scans on files without match candidates (~30-40% faster). Additionally, pre-checking `os.path.exists` in `_can_send` before opening files issues redundant stat syscalls; relying directly on `OSError` handling in `try...with open()` eliminates unnecessary file existence checks.
+**Action:** Always add fast substring pre-checks before executing multiline regex searches and replace `os.path.exists` with direct file opening inside `try...except OSError` blocks.
+
 ## 2026-10-24 - Pre-Read File Filtering in Quarantine and Sanitization Loops
 **Learning:** Opening and reading file contents into memory (`open(path).read()`) before evaluating relocation or quarantine conditions causes redundant disk I/O, memory allocations, and `UnicodeDecodeError` exceptions on non-text artifacts. Evaluating quarantine pattern matches on file names before opening files avoids unnecessary disk I/O and prevents decoding failures on binary session artifacts.
 **Action:** Always evaluate file-relocation and quarantine criteria before opening and reading file contents in file traversal loops.

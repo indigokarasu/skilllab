@@ -90,9 +90,9 @@ def score_heuristic(skill_path):
         score -= 2
     
     # D9: scripts --help
-    # Single os.listdir pass avoids glob pattern compilation & double directory scanning
+    # Performance optimization: Direct os.listdir inside try/except avoids redundant os.path.isdir stat call
     scripts_dir = os.path.join(skill_dir, "scripts")
-    if os.path.isdir(scripts_dir):
+    try:
         scripts = [
             os.path.join(scripts_dir, f)
             for f in os.listdir(scripts_dir)
@@ -110,6 +110,8 @@ def score_heuristic(skill_path):
                     pass
             if helped < len(scripts):
                 score -= (len(scripts) - helped)
+    except OSError:
+        pass
     
     # D10: gotchas
     if "Gotchas" not in md and "Pitfalls" not in md:
