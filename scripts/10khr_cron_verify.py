@@ -63,15 +63,16 @@ def _can_send(src_or_path):
     Performance optimization: Accepts pre-read `src` text directly to avoid
     opening and reading script files twice in verification loops. Fast-path
     string checks ("\n", len > 1024) detect source code immediately without
-    triggering redundant `os.path.exists` filesystem stat calls on source strings.
+    triggering redundant `os.path.exists` filesystem stat calls. Direct file open
+    relies on OSError for non-existent paths, eliminating stat syscalls.
     """
-    if "\n" in src_or_path or len(src_or_path) > 1024 or not os.path.exists(src_or_path):
+    if "\n" in src_or_path or len(src_or_path) > 1024:
         return bool(_OUTBOUND_SKIP.search(src_or_path))
     try:
         with open(src_or_path, encoding="utf-8", errors="ignore") as f:
             return bool(_OUTBOUND_SKIP.search(f.read()))
     except OSError:
-        return False
+        return bool(_OUTBOUND_SKIP.search(src_or_path))
 
 
 _CODE_RATIO_MOD = None
@@ -148,75 +149,76 @@ def ondisk_check(skill_name, skill_path, runner):
 
     # D5: checklist — search main SKILL.md + references/ directory, because
     # a `- [ ]` quality checklist may legitimately live in a referenced support file.
-    # Performance optimization: Use direct os.path.isdir & os.listdir on references/
-    # to avoid os.walk generator and tuple allocation overhead.
+    # Performance optimization: Direct os.listdir inside try/except eliminates
+    # redundant os.path.isdir stat call per skill.
     has_cb = "- [ ]" in content
     if not has_cb:
         refs_dir = os.path.join(d, "references")
-        if os.path.isdir(refs_dir):
-            try:
-                for fn in os.listdir(refs_dir):
-                    if not fn.endswith(".md"):
-                        continue
-                    try:
-                        with open(os.path.join(refs_dir, fn), encoding="utf-8", errors="ignore") as f:
-                            if "- [ ]" in f.read():
-                                has_cb = True
-                                break
-                    except Exception:
-                        continue
-            except OSError:
-                pass
+        try:
+            for fn in os.listdir(refs_dir):
+                if not fn.endswith(".md"):
+                    continue
+                try:
+                    with open(os.path.join(refs_dir, fn), encoding="utf-8", errors="ignore") as f:
+                        if "- [ ]" in f.read():
+                            has_cb = True
+                            break
+                except Exception:
+                    continue
+        except OSError:
+            pass
     out["D5"] = "OK" if has_cb else "NO checklist (main or refs)"
 
     # D9: every CLI script --help must exit 0
     # Performance & correctness optimization: Combine _can_send safety guard with
     # runner's non-CLI and test entrypoint filtering to avoid wasteful subprocess spawning
     # (~50ms per non-CLI script) and eliminate false-positive failure reports on helper modules,
-    # while guaranteeing 100% safety against outbound side-effects.
+    # while guaranteeing 100% safety against outbound side-effects. Direct os.listdir
+    # with try/except eliminates redundant os.path.isdir stat call.
     sd = os.path.join(d, "scripts")
-    if os.path.isdir(sd):
-        miss = []
+    try:
         scripts = sorted(f for f in os.listdir(sd) if f.endswith((".py", ".sh")))
-        count = len(scripts)
-        for s in scripts:
-            sp = os.path.join(sd, s)
-            try:
-                with open(sp, encoding="utf-8", errors="ignore") as f:
-                    src = f.read()
-            except OSError:
-                src = ""
-            if not src:
-                continue
-            # 1. Outbound safety check: pass pre-read `src` to avoid redundant file open/read
-            if _can_send(src):
-                continue
-            # 2. Skip test entrypoints and non-CLI modules to avoid slow & false-positive --help checks
-            if runner._is_test_entrypoint(src):
-                continue
-            if not runner._is_cli_entrypoint(src):
-                continue
-            if runner._outbound_capable(s, src):
-                if not runner._flag_safe(s, src):
-                    miss.append(s)
-                continue
+    except OSError:
+        scripts = []
 
-            try:
-                cmd = ["bash", sp, "--help"] if s.endswith(".sh") else [sys.executable, sp, "--help"]
-                rc = subprocess.run(cmd, input="", capture_output=True, text=True, timeout=30).returncode
-            except Exception:
-                rc = -1
-            if rc != 0:
+    miss = []
+    count = len(scripts)
+    for s in scripts:
+        sp = os.path.join(sd, s)
+        try:
+            with open(sp, encoding="utf-8", errors="ignore") as f:
+                src = f.read()
+        except OSError:
+            src = ""
+        if not src:
+            continue
+        # 1. Outbound safety check: pass pre-read `src` to avoid redundant file open/read
+        if _can_send(src):
+            continue
+        # 2. Skip test entrypoints and non-CLI modules to avoid slow & false-positive --help checks
+        if runner._is_test_entrypoint(src):
+            continue
+        if not runner._is_cli_entrypoint(src):
+            continue
+        if runner._outbound_capable(s, src):
+            if not runner._flag_safe(s, src):
                 miss.append(s)
+            continue
 
-        if count == 0:
-            out["D9"] = "N/A (no scripts)"
-        elif not miss:
-            out["D9"] = "OK (all exit 0)"
-        else:
-            out["D9"] = f"MISSING --help: {miss}"
-    else:
+        try:
+            cmd = ["bash", sp, "--help"] if s.endswith(".sh") else [sys.executable, sp, "--help"]
+            rc = subprocess.run(cmd, input="", capture_output=True, text=True, timeout=30).returncode
+        except Exception:
+            rc = -1
+        if rc != 0:
+            miss.append(s)
+
+    if count == 0:
         out["D9"] = "N/A (no scripts)"
+    elif not miss:
+        out["D9"] = "OK (all exit 0)"
+    else:
+        out["D9"] = f"MISSING --help: {miss}"
     return out
 
 
