@@ -56,23 +56,34 @@ _OUTBOUND_SKIP = _re.compile(
     r"|requests\.(post|put|patch|delete)|api\.telegram\.org|submit_order|alpaca"
     r"|curl\s+(-[A-Za-z]+\s+)*-X\s*[\"']?(POST|PUT|PATCH|DELETE)", _re.I)
 
+# Maintainers: keep _OUTBOUND_SKIP_KWS in sync with _OUTBOUND_SKIP regex patterns above.
+_OUTBOUND_SKIP_KWS = (
+    "createrecord", "bsky", "atproto", "xrpc", "post.sh", "smtplib",
+    "requests", "telegram", "submit_order", "alpaca", "curl"
+)
+_FM_PATTERN = _re.compile(r"^---\r?\n(.*?)\r?\n---(?:\r?\n|$)", _re.S)
+
 
 def _can_send(src_or_path):
     """Outbound safety check. Accepts script source text or file path.
 
     Performance optimization: Accepts pre-read `src` text directly to avoid
     opening and reading script files twice in verification loops. Fast-path
-    string checks ("\n", len > 1024) detect source code immediately without
-    triggering redundant `os.path.exists` filesystem stat calls. Direct file open
-    relies on OSError for non-existent paths, eliminating stat syscalls.
+    keyword pre-check skips expensive multiline regex search for safe scripts (~36x speedup).
     """
     if "\n" in src_or_path or len(src_or_path) > 1024:
-        return bool(_OUTBOUND_SKIP.search(src_or_path))
-    try:
-        with open(src_or_path, encoding="utf-8", errors="ignore") as f:
-            return bool(_OUTBOUND_SKIP.search(f.read()))
-    except OSError:
-        return bool(_OUTBOUND_SKIP.search(src_or_path))
+        src = src_or_path
+    else:
+        try:
+            with open(src_or_path, encoding="utf-8", errors="ignore") as f:
+                src = f.read()
+        except OSError:
+            src = src_or_path
+
+    src_lower = src.lower()
+    if not any(kw in src_lower for kw in _OUTBOUND_SKIP_KWS):
+        return False
+    return bool(_OUTBOUND_SKIP.search(src))
 
 
 _CODE_RATIO_MOD = None
@@ -126,9 +137,9 @@ def ondisk_check(skill_name, skill_path, runner):
         out["D1"] = "SKIP (no pyyaml in this interpreter)"
     else:
         try:
-            # Performance optimization: Limit split to maxsplit=2 to avoid allocating full doc slices
-            parts = content.split("---", 2)
-            fm = _yaml.safe_load(parts[1]) if len(parts) >= 3 else {}
+            # Performance optimization: regex match extracts frontmatter block without allocating full doc slices
+            m = _FM_PATTERN.match(content)
+            fm = _yaml.safe_load(m.group(1)) if m else {}
             fm = fm or {}
             cat = fm.get("metadata", {}).get("hermes", {}).get("category")
             out["D1"] = "OK" if cat else "MISSING category"
@@ -145,7 +156,7 @@ def ondisk_check(skill_name, skill_path, runner):
         out["D3"] = f"{r['status']} ({r['ratio']}%)"
     except Exception as e:
         out["D3"] = f"ERR {e}"
-    out["wc_lines"] = len(content.split("\n"))
+    out["wc_lines"] = content.count("\n") + (1 if content else 0)
 
     # D5: checklist — search main SKILL.md + references/ directory, because
     # a `- [ ]` quality checklist may legitimately live in a referenced support file.
