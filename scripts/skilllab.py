@@ -129,6 +129,7 @@ def scan_skills():
 
 
 _YAML_MODULE = None
+_FRONTMATTER_BLOCK_PATTERN = re.compile(r"^---\r?\n(.*?)\r?\n---(?:\r?\n|$)", re.S)
 
 def _get_yaml():
     """Cached PyYAML module loader to avoid repeated imports in loops."""
@@ -148,15 +149,13 @@ def parse_frontmatter(path):
     try:
         with open(path) as f:
             content = f.read()
-        if not content.startswith("---"):
-            return info
-        parts = content.split("---", 2)
-        if len(parts) < 3:
+        m = _FRONTMATTER_BLOCK_PATTERN.match(content)
+        if not m:
             return info
         yaml = _get_yaml()
         if not yaml:
             return info
-        fm = yaml.safe_load(parts[1])
+        fm = yaml.safe_load(m.group(1))
         if not fm:
             return info
         info["name"] = str(fm.get("name", ""))

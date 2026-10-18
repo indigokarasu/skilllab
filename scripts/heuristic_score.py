@@ -65,6 +65,9 @@ def check_correctness(skill_dir):
         d8 = max(0, d8 - 1)
     return d8, findings
 
+_FRONTMATTER_BLOCK_PATTERN = re.compile(r"^---\r?\n(.*?)\r?\n---(?:\r?\n|$)", re.S)
+
+
 def check_frontmatter_parses(skill_dir, text=None, return_meta=False):
     """Verify frontmatter parses as valid YAML.
 
@@ -79,12 +82,11 @@ def check_frontmatter_parses(skill_dir, text=None, return_meta=False):
                 text = f.read()
         except OSError:
             return (False, {}) if return_meta else False
-    # Performance optimization: Limit split to maxsplit=2 to avoid splitting remainder of document
-    parts = text.split("---", 2)
-    if len(parts) < 3:
+    m = _FRONTMATTER_BLOCK_PATTERN.match(text)
+    if not m:
         return (False, {}) if return_meta else False
     try:
-        fm = yaml.safe_load(parts[1]) if yaml else {}
+        fm = yaml.safe_load(m.group(1)) if yaml else {}
         is_valid = fm is not None
         return (is_valid, fm if is_valid else {}) if return_meta else is_valid
     except Exception:

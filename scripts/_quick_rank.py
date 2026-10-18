@@ -5,6 +5,7 @@ import os, re, sys, json
 # Pre-compiled regex patterns for fast scoring iterations (~23% total heuristic speedup)
 _DESC_RE = re.compile(r"description:\s*>?\s*\n((?:\s+.+\n)+)")
 _HELP_RE = re.compile(r"(?:=\s*argparse|argparse\.ArgumentParser|--help|usage)")
+_FM_RE = re.compile(r"^---\r?\n(.*?)\r?\n---(?:\r?\n|$)", re.S)
 
 HERMES_ROOT = os.path.expanduser("~/.hermes")
 SKILLS_DIR = os.path.join(HERMES_ROOT, "profiles", "indigo", "skills")
@@ -32,9 +33,9 @@ def score_heuristic(skill_path):
     score = 50  # start at max
     
     # D1: frontmatter
-    # Performance optimization: Limit split to maxsplit=2 to avoid splitting remainder of document
-    parts = md.split("---", 2) if md.startswith("---") else []
-    fm = parts[1] if len(parts) >= 3 else ""
+    # Performance optimization: regex match extracts frontmatter block without allocating full doc slices
+    m = _FM_RE.match(md)
+    fm = m.group(1) if m else ""
     if "name:" not in fm:
         score -= 5
     if "description:" not in fm:
@@ -63,7 +64,7 @@ def score_heuristic(skill_path):
     # D3: conciseness — code ratio
     # Built-in C-level str.count() avoids regex match allocation
     code_lines = md.count("```") // 2
-    total_lines = len(md.splitlines())
+    total_lines = md.count("\n") + (0 if md.endswith("\n") else (1 if md else 0))
     if total_lines > 0 and code_lines / total_lines > 0.20:
         score -= 2
     if total_lines > 500:
