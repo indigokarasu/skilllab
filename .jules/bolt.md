@@ -1,3 +1,7 @@
+## 2026-10-27 - Prioritize In-Memory Set Lookups Over Filesystem Stat Operations in Reference Resolution
+**Learning:** Checking `os.path.exists(skill_ref)` prior to checking cached sibling basenames executes redundant filesystem `stat` syscalls for every valid reference. Moving the O(1) in-memory `base in sibling_files` check ahead of `os.path.exists` completely eliminates `stat` syscall overhead for valid local and sibling references during dead reference audits.
+**Action:** Always place O(1) in-memory set and cache lookups before `os.path.exists` filesystem stat calls in path resolution helper functions.
+
 ## 2026-10-26 - Fast-Path Keyword Pre-Checks for Multiline Verbose Regexes in Outbound Safety Guards
 **Learning:** Running multiline verbose case-insensitive regexes (`_OUTBOUND.search` and `_OUTBOUND_SKIP.search`) across every script in skill assessment loops incurs heavy CPU execution overhead on safe scripts. Pre-checking candidate keyword tuples (`_OUTBOUND_KWS`) in lowercase script source short-circuits regex evaluation for safe scripts (~36x speedup). Additionally, replacing `content.split("---", 2)` with regex pattern matching avoids allocating large document tail slices during frontmatter parsing across batch skill scans.
 **Action:** Always add fast candidate keyword tuple pre-checks before executing verbose multiline regexes, and use regex matching instead of `split()` when parsing header blocks from long documents.

@@ -513,20 +513,20 @@ def _ref_resolves(skill_dir, ref):
 
     Skills cross-reference each other constantly. Resolving only against
     skill_dir marks all of those dead — the false positive that makes a
-    dead-ref check worthless. Try, in order: the skill itself, the cached
-    sibling basenames (O(1) in-memory set lookup), then the skills root
+    dead-ref check worthless. Try, in order: the cached sibling basenames
+    (O(1) in-memory set lookup), local skill_dir path, then the skills root
     and agent root fallback paths.
     """
-    # Performance optimization: normalize path upfront to avoid duplicate os.path.exists stat calls
-    skill_ref = os.path.normpath(os.path.join(skill_dir, ref))
-    if os.path.exists(skill_ref):
-        return True
     root = os.path.dirname(os.path.abspath(skill_dir.rstrip("/")))
     # Performance optimization: Fast O(1) in-memory check against cached sibling basenames
-    # skips unnecessary os.path.exists stat syscalls on root and agent_root paths.
+    # (which includes local skill files) avoids unnecessary os.path.exists stat syscalls.
     base = os.path.basename(ref)
     sibling_files = _get_sibling_basenames(root)
     if base in sibling_files:
+        return True
+    # Performance optimization: normalize path upfront to avoid duplicate os.path.exists stat calls
+    skill_ref = os.path.normpath(os.path.join(skill_dir, ref))
+    if os.path.exists(skill_ref):
         return True
     if os.path.exists(os.path.normpath(os.path.join(root, ref))):
         return True
@@ -772,7 +772,6 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
 
     with open(skill_path) as f:
         content = f.read()
-    lines = content.split("\n")
 
     # Performance optimization: Pre-compute content_lower once to eliminate 10+ redundant lowercasing string allocations per skill
     content_lower = content.lower()
@@ -812,6 +811,8 @@ def score_skill(skill_name: str, skill_path: str) -> dict:
     if fm.get("triggers"):
         d2 = min(5, d2 + 1)
     scores["D2"] = min(5, d2)
+
+    lines = content.split("\n")
 
     # ── D3: Conciseness (code ratio) ──
     total_lines = len(lines)
