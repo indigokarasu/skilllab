@@ -183,6 +183,7 @@ DESTRUCTIVE = [
     (re.compile(r"push\W+--force(?!-with-lease)"), "git push --force"),
 ]
 GUARD = re.compile(r"dry[_-]?run|confirm|are you sure|input\(|refus|abort|--force\b", re.I)
+_SAFE_TMP_RE = re.compile(r"set\s+-[a-z]*u")
 
 STDLIB_OK = re.compile(
     r"^(?:os|sys|re|io|json|argparse|subprocess|pathlib|datetime|time|glob|shutil|"
@@ -739,7 +740,8 @@ def check_correctness(skill_dir):
                     code = raw
                 if GUARD.search(code):
                     continue
-                safe_tmp = "mktemp" in code and re.search(r"set\s+-[a-z]*u", code)
+                # Performance optimization: Use pre-compiled _SAFE_TMP_RE to avoid regex recompilation per script
+                safe_tmp = "mktemp" in code and bool(_SAFE_TMP_RE.search(code))
                 for rx, lbl in DESTRUCTIVE:
                     if rx.search(code) and not (lbl == "rm -rf" and safe_tmp):
                         hits.append("%s in %s" % (lbl, f))
