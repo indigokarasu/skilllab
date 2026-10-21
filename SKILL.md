@@ -33,7 +33,7 @@ metadata:
         description: "Profile name whose skills directory is scanned (defaults to 'indigo')"
         default: "indigo"
 
-source: https://github.com/<agent-handle>/skilllab
+source: https://github.com/indigokarasu/skilllab
 includes:
   - references/**
   - scripts/**
