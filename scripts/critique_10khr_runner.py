@@ -410,7 +410,7 @@ def _module_scope_import_bases(path, mtime=0.0):
     return bases
 
 
-def check_module_scope_imports(script_dir):
+def check_module_scope_imports(script_dir, dir_files=None):
     """Third-party imports at module scope break --help wherever they're absent.
 
     Executing --help only proves it works in THIS interpreter. A module-scope
@@ -426,12 +426,14 @@ def check_module_scope_imports(script_dir):
     """
     import os
     offenders = []
-    # Performance optimization: Caching dir_files as a set reduces O(imports) os.path.exists
-    # stat syscalls for sibling module lookups to O(1) set membership checks.
-    # Direct os.listdir with exception handling eliminates redundant os.path.isdir stat call.
-    try:
-        dir_files = set(os.listdir(script_dir))
-    except OSError:
+    # Performance optimization: Accept pre-fetched dir_files or cache as set to reduce
+    # O(imports) os.path.exists stat syscalls for sibling module lookups to O(1) set membership.
+    if dir_files is None:
+        try:
+            dir_files = set(os.listdir(script_dir))
+        except OSError:
+            return []
+    if not dir_files:
         return []
 
     for f in sorted(dir_files):
@@ -488,6 +490,7 @@ def _get_sibling_basenames(root: str) -> frozenset:
     stat syscalls during dead reference checking to O(S) dir listing ops,
     improving dead-reference check performance by ~60x across skill audits.
     Direct os.listdir calls inside try/except eliminate redundant os.path.isdir stat calls.
+    Catches OSError on the root entry listing to skip checking subdirectories for regular files.
     Returns frozenset to prevent cache mutations and speed up set lookups.
     """
     basenames = set()
@@ -497,12 +500,17 @@ def _get_sibling_basenames(root: str) -> frozenset:
         return frozenset(basenames)
     for sib in siblings:
         p = os.path.join(root, sib)
-        # Performance optimization: Attempt os.listdir directly inside try/except OSError
-        # to avoid ~5 redundant os.path.isdir stat syscalls per sibling entry.
-        for sub in ("", "references", "scripts", "assets", "templates"):
-            subpath = os.path.join(p, sub) if sub else p
+        # Performance optimization: Attempt os.listdir directly on sibling path `p`.
+        # If `p` is a regular file rather than a directory, catching OSError and continuing
+        # skips 4 unnecessary failed os.listdir calls for references/scripts/assets/templates.
+        try:
+            for f in os.listdir(p):
+                basenames.add(f)
+        except OSError:
+            continue
+        for sub in ("references", "scripts", "assets", "templates"):
             try:
-                for f in os.listdir(subpath):
+                for f in os.listdir(os.path.join(p, sub)):
                     basenames.add(f)
             except OSError:
                 pass
@@ -608,9 +616,11 @@ def _ref_resolves_absorbed(skill_dir, ref, text):
     This re-scans the source text for the full path that leads into the
     captured suffix, expands ``~`` and ``$HOME``, and checks existence
     directly. Returns True when the real file is found.
-    Performance optimization: Direct _ABSORBED_PATH_PATTERN.finditer(text)
-    avoids text.splitlines() and line iteration (~13x speedup on regex search).
+    Performance optimization: Short-circuits regex evaluation if text lacks path variable indicators
+    ('~' and '$'), and uses direct _ABSORBED_PATH_PATTERN.finditer(text) (~13x speedup).
     """
+    if "~" not in text and "$" not in text:
+        return False
     for m in _ABSORBED_PATH_PATTERN.finditer(text):
         full = m.group(1)
         # Only consider candidates that actually end in the captured ref.
@@ -748,14 +758,16 @@ def check_correctness(skill_dir):
     if hits:
         score -= 2; findings.append("unguarded " + "; ".join(sorted(set(hits))))
 
-    imp = check_module_scope_imports(sdir)
+    imp = check_module_scope_imports(sdir, dir_files=set(sfiles) if sfiles else None)
     if imp:
         score -= 1
         findings.append("module-scope 3rd-party import (breaks --help without deps): "
                         + ", ".join(imp[:3]))
 
-    gate = os.path.join(skill_dir, "scripts", "check_no_pii.py")
-    if os.path.exists(gate):
+    # Performance optimization: Reuse in-memory sfiles list to check if check_no_pii.py exists,
+    # eliminating an extra os.path.exists stat syscall per skill.
+    if "check_no_pii.py" in sfiles:
+        gate = os.path.join(skill_dir, "scripts", "check_no_pii.py")
         rc, _ = _run([sys.executable, gate, "--quiet"], cwd=skill_dir)
         if rc != 0:
             score -= 1; findings.append("PII gate FAILS")
