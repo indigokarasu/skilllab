@@ -70,8 +70,9 @@ def _can_send(src_or_path):
     Performance optimization: Accepts pre-read `src` text directly to avoid
     opening and reading script files twice in verification loops. Fast-path
     keyword pre-check skips expensive multiline regex search for safe scripts (~36x speedup).
+    Guards open() calls with os.path.exists check to avoid attempting to open short pre-read strings as paths.
     """
-    if "\n" in src_or_path or len(src_or_path) > 1024:
+    if "\n" in src_or_path or len(src_or_path) > 1024 or not os.path.exists(src_or_path):
         src = src_or_path
     else:
         try:
