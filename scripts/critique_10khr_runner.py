@@ -323,6 +323,19 @@ def _flag_safe(name, src):
         or bool(_ARGV_HELP_RE.search(src))
 
 
+@functools.lru_cache(maxsize=256)
+def _check_script_help_exec(path: str, mtime: float) -> int:
+    """Run script --help in subprocess cached by file path and mtime.
+
+    Performance optimization: Caching return code by (path, mtime) eliminates
+    redundant subprocess creation overhead (~50ms per script execution) across
+    repeated skill scoring iterations.
+    """
+    cmd = ["bash", path, "--help"] if path.endswith(".sh") else [sys.executable, path, "--help"]
+    rc, _ = _run(cmd, cwd=os.path.dirname(path))
+    return rc
+
+
 def check_scripts_help(script_dir, execute=True):
     """Do executable scripts ACTUALLY answer --help? Returns (ok, broken, total).
 
@@ -364,8 +377,7 @@ def check_scripts_help(script_dir, execute=True):
             continue
 
         if execute:
-            cmd = ["bash", name, "--help"] if name.endswith(".sh") else [sys.executable, name, "--help"]
-            rc, _ = _run(cmd, cwd=script_dir)
+            rc = _check_script_help_exec(path, mtime)
             ok.append(name) if rc == 0 else broken.append("%s (rc=%d)" % (name, rc))
         else:
             # argparse automatically provides -h/--help; don't require the
