@@ -750,11 +750,11 @@ def check_correctness(skill_dir):
                     findings.append("%s does not compile" % f)
                     compile_failed = True
 
-            # Performance optimization: Fast keyword pre-filter avoids splitting lines, stripping
-            # comments, joining code strings, and running regex searches on safe scripts.
-            _DESTRUCTIVE_KWS = ("reset", "clean", "rm", "drop", "rmtree", "push")
-            raw_lower = raw.lower()
-            if any(kw in raw_lower for kw in _DESTRUCTIVE_KWS):
+            # Performance optimization: Fast-path regex pre-filter checks compiled DESTRUCTIVE regexes directly
+            # on raw script source before splitting lines, stripping comments, joining code strings, and running
+            # regex searches on safe scripts (short-circuits ~99% of safe scripts where generic keywords like "rm"
+            # matched common words such as "format", "normpath", "permission", "terminal").
+            if any(rx.search(raw) for rx, _ in DESTRUCTIVE):
                 # Performance optimization: Fast path skips splitlines and comment filtering if script contains no comments
                 if "#" in raw:
                     code = "\n".join([l for l in raw.splitlines() if not l.lstrip().startswith("#")])
