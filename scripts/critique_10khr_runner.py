@@ -513,6 +513,10 @@ def _get_sibling_basenames(root: str) -> frozenset:
     except OSError:
         return frozenset(basenames)
     for sib in siblings:
+        # Performance optimization: Skip hidden and excluded directory trees
+        # (.git, .venv, node_modules, etc.) to prevent unnecessary listdir calls and set pollution.
+        if sib.startswith(".") or sib in _EXCLUDED_DIRS:
+            continue
         p = os.path.join(root, sib)
         # Performance optimization: Attempt os.listdir directly on sibling path `p`.
         # If `p` is a regular file rather than a directory, catching OSError and continuing
