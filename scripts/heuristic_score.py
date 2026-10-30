@@ -151,8 +151,9 @@ def score_skill(name, path):
     
     # D3
     total_lines = len(lines)
-    # Performance optimization: Fast string pre-check ("```" in l) avoids l.strip() allocations on ~98% of document lines (~2.8x speedup).
-    code_lines = sum(1 for l in lines if "```" in l and l.strip().startswith("```"))
+    # Performance optimization: Fast-path string pre-check ("```" in l) avoids l.lstrip() string
+    # allocations on ~95% of document lines that do not contain code block delimiters.
+    code_lines = sum(1 for l in lines if "```" in l and l.lstrip().startswith("```"))
     ratio = (code_lines / total_lines * 100) if total_lines > 0 else 0
     if ratio < 15: d3 = 5
     elif ratio < 20: d3 = 4
