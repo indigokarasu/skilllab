@@ -15,7 +15,7 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 
-from critique_10khr_runner import check_dead_references
+from critique_10khr_runner import check_dead_references, _get_sibling_basenames, _EXCLUDED_DIRS
 
 
 def test_existing_qualified_path_not_dead():
@@ -43,6 +43,29 @@ def test_genuinely_dead_ref_still_caught():
     assert dead == ["references/never-written.md"], (
         "genuine dead ref not caught; got %r" % dead
     )
+
+
+def test_sibling_basenames_skips_hidden_and_excluded():
+    root = tempfile.mkdtemp()
+    # hidden sibling
+    hidden = os.path.join(root, ".git")
+    os.makedirs(hidden)
+    io.open(os.path.join(hidden, "secret.txt"), "w").close()
+    # excluded sibling
+    excluded = os.path.join(root, "node_modules")
+    os.makedirs(excluded)
+    io.open(os.path.join(excluded, "pkg.json"), "w").close()
+    # normal sibling skill
+    skill = os.path.join(root, "my-skill")
+    os.makedirs(os.path.join(skill, "references"))
+    io.open(os.path.join(skill, "SKILL.md"), "w").close()
+    io.open(os.path.join(skill, "references", "foo.md"), "w").close()
+
+    basenames = _get_sibling_basenames(root)
+    assert "SKILL.md" in basenames
+    assert "foo.md" in basenames
+    assert "secret.txt" not in basenames
+    assert "pkg.json" not in basenames
 
 
 if __name__ == "__main__":
