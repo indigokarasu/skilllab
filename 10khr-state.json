@@ -1,12 +1,14 @@
 {
-  "last_run": "2026-10-27T17:55:06+00:00",
-  "last_target": "ocas-sands",
-  "last_score_before": 46,
-  "last_score_after": 50,
+  "last_run": "2026-11-01T22:33:32.996974+00:00",
+  "last_target": "ocas-custodian",
+  "last_score_before": "49/50",
+  "last_score_after": "50/50",
   "skills_improved_this_session": [
-    "ocas-sands"
+    "ocas-sands",
+    "ocas-lucid",
+    "ocas-custodian"
   ],
-  "skills_improved": 35,
+  "skills_improved": 37,
   "skill_history": [
     {
       "skill": "ocas-reflex",
@@ -46,12 +48,12 @@
     },
     {
       "skill": "ocas-finch",
-      "score_before": "43/50 heuristic. Manual rubric: D1=5, D2=5, D3=3 [a 33,203-char 'Scanning gotchas' block was 62% of the file — 43 dated trap narratives inline, none of them present in the references they cite], D4=4 [310 lines but 13,442 approx tokens, over the 5,000 budget], D5=5, D6=5, D7=5, D8=1 [four real defects: the skill's own unittest suite FAILED, unguarded shutil.rmtree in 3 test files, module-scope `google` imports in 3 watchers, and --help side effects], D9=5, D10=5.",
+      "score_before": "43/50 heuristic. Manual rubric: D1=5, D2=5, D3=3 [a 33,203-char 'Scanning gotchas' block was 62% of the file \u2014 43 dated trap narratives inline, none of them present in the references they cite], D4=4 [310 lines but 13,442 approx tokens, over the 5,000 budget], D5=5, D6=5, D7=5, D8=1 [four real defects: the skill's own unittest suite FAILED, unguarded shutil.rmtree in 3 test files, module-scope `google` imports in 3 watchers, and --help side effects], D9=5, D10=5.",
       "score_after": "50/50 heuristic (D1-D10 all 5/5), verified on-disk + live --help probes on all 64 scripts + full unittest suite + YAML/reference-integrity + PII gate diffed against HEAD.",
-      "fixes": "D8 (the substantive dimension, 1->5). Four defects, all live: (1) test_blocked_config_decay.py, test_ehcs_watch_paths.py and test_finch_ledger_guard_selfstamp.py had NO argument handling, so --help ran the entire live-fixture suite and exited 1 — which is why the skill's own test_finch.py::ScriptsExposeHelp was failing. All three now carry a guard placed after the imports and BEFORE the work. (2) test_restore_doublefire_watch.py had no guard either, and that one is the fourth consecutive instance of this class: measured 20.7s per --help and it created real directories in /root on every probe (two orphaned /root/finch999_* trees found and removed after verifying they held only fixture copies of the watcher). Now 0.057s and writes nothing. (3) 3 watchers imported google.oauth2/googleapiclient at module scope, so --help died before argparse on any host without those libs; moved into the functions that use them. (4) unguarded shutil.rmtree in 3 test files: replaced with a register-at-creation rmtree_confined() — the invariant is 'this module created it', NOT 'it lives under /tmp', because two of these suites deliberately build fixtures outside /tmp (a profile-scoped scratch dir and a synthetic $HOME) so path resolution is exercised against the real layout; a /tmp-only allowlist would have made passing tests fail for a reason unrelated to the world. test_ocas_mailbox.py got the same check. D3/D4: extracted the 33KB block to references/scanning-traps.md, regrouped into 7 themes with a when-to-read table and a TOC (43 traps, none lost — verified 43/43 assigned); the full Scripts table to references/scripts-reference.md; and the ledger/clock/restore reasoning to references/ledger-and-clock-protocol.md. SKILL.md 53,768 -> 13,972 chars (13,442 -> 3,493 tokens), 310 -> 201 lines, with every rule and its one-line failure kept inline and the measurements moved behind pointers.",
+      "fixes": "D8 (the substantive dimension, 1->5). Four defects, all live: (1) test_blocked_config_decay.py, test_ehcs_watch_paths.py and test_finch_ledger_guard_selfstamp.py had NO argument handling, so --help ran the entire live-fixture suite and exited 1 \u2014 which is why the skill's own test_finch.py::ScriptsExposeHelp was failing. All three now carry a guard placed after the imports and BEFORE the work. (2) test_restore_doublefire_watch.py had no guard either, and that one is the fourth consecutive instance of this class: measured 20.7s per --help and it created real directories in /root on every probe (two orphaned /root/finch999_* trees found and removed after verifying they held only fixture copies of the watcher). Now 0.057s and writes nothing. (3) 3 watchers imported google.oauth2/googleapiclient at module scope, so --help died before argparse on any host without those libs; moved into the functions that use them. (4) unguarded shutil.rmtree in 3 test files: replaced with a register-at-creation rmtree_confined() \u2014 the invariant is 'this module created it', NOT 'it lives under /tmp', because two of these suites deliberately build fixtures outside /tmp (a profile-scoped scratch dir and a synthetic $HOME) so path resolution is exercised against the real layout; a /tmp-only allowlist would have made passing tests fail for a reason unrelated to the world. test_ocas_mailbox.py got the same check. D3/D4: extracted the 33KB block to references/scanning-traps.md, regrouped into 7 themes with a when-to-read table and a TOC (43 traps, none lost \u2014 verified 43/43 assigned); the full Scripts table to references/scripts-reference.md; and the ledger/clock/restore reasoning to references/ledger-and-clock-protocol.md. SKILL.md 53,768 -> 13,972 chars (13,442 -> 3,493 tokens), 310 -> 201 lines, with every rule and its one-line failure kept inline and the measurements moved behind pointers.",
       "grounded": "manual+on-disk+live-help-probes-on-all-64-scripts+full-unittest-suite+YAML-and-reference-integrity+pii-gate-diffed-against-HEAD",
       "at": "2026-09-29T18:27:32+00:00",
-      "note": "Skip condition NOT met: SKILL.md mtime 2026-09-29 09:40 is AFTER last_run 2026-09-28 18:23, so the >=44 exemption did not apply on either clause. Two process notes, both about my own tooling. (a) --report-only rewrites last_run to now, which would have made every skill read as modified; I imported score_skill() directly instead of walking mtimes. (b) Three of the four D8 defects were in files matched by .gitignore (test_*_watch*.py), so there was no clean git restore when my scripted rmtree edit rewrote the helper's own body into infinite recursion. I repaired forward and confirmed each suite's real exit code afterwards — but a bulk regex rewrite over files git does not track is the one operation in this workflow with no undo, and the correct order is to snapshot before editing, not after. Worth making that a step. Also: two scripts I authored during this run (finch_score.py and friends) were written to cache/scratch, and python3 -c / execute_code are both blocked in cron, so every probe went through a file — the same constraint the skill's own Tirith section documents. Whole-skill PII findings are 132, IDENTICAL to HEAD (verified by git stash), so none of them are mine; the four files I created/changed are individually CLEAN. util-draw is next at 43."
+      "note": "Skip condition NOT met: SKILL.md mtime 2026-09-29 09:40 is AFTER last_run 2026-09-28 18:23, so the >=44 exemption did not apply on either clause. Two process notes, both about my own tooling. (a) --report-only rewrites last_run to now, which would have made every skill read as modified; I imported score_skill() directly instead of walking mtimes. (b) Three of the four D8 defects were in files matched by .gitignore (test_*_watch*.py), so there was no clean git restore when my scripted rmtree edit rewrote the helper's own body into infinite recursion. I repaired forward and confirmed each suite's real exit code afterwards \u2014 but a bulk regex rewrite over files git does not track is the one operation in this workflow with no undo, and the correct order is to snapshot before editing, not after. Worth making that a step. Also: two scripts I authored during this run (finch_score.py and friends) were written to cache/scratch, and python3 -c / execute_code are both blocked in cron, so every probe went through a file \u2014 the same constraint the skill's own Tirith section documents. Whole-skill PII findings are 132, IDENTICAL to HEAD (verified by git stash), so none of them are mine; the four files I created/changed are individually CLEAN. util-draw is next at 43."
     },
     {
       "skill": "util-voice-call",
@@ -93,7 +95,7 @@
       "skill": "util-hermes-ops",
       "score_before": "49/50 (heuristic D9=4; on-disk manual: D3=4 [22.4% code ratio >20%], D4=4 [513 lines >500], D5=4 [mislabeled heading 'Profile Naming Conventions' = systemd pitfall; empty artifact heading '### Profile Naming'; duplicate 'Step 2/3/4' numbering in install workflow])",
       "score_after": "50/50 (manual rubric: all 10 dimensions 5/5; verified on-disk)",
-      "fixes": "D3+D4: extracted the 135-line inline 'Profile Creation & Skill Installation Workflow' section (with its duplicate 'Step 2/3/4' labels) into references/profile-creation-install.md as a clean Step 1-6 checklist; replaced inline with a summary + pointer. SKILL.md 513->398 lines (under 500 D4 threshold); code ratio 22.4%->15.3% (under 20% D3 target). D5: fixed three heading defects — renamed mislabeled '### Profile Naming Conventions' (systemd HERMES_HOME pitfall) to '### Systemd HERMES_HOME / -p Profile Override Pitfall'; removed an empty artifact heading '### Profile Naming' that preceded skillgrade; promoted the orphaned 'Profile Naming Conventions' bullet block to a proper top-level section. D8: added the new reference to the Support File Map with a When-to-read trigger. Scripts (close_wait_killer.py, gateway_cleanup.py) already passed D9 (argparse --help exits 0, --dry-run present).",
+      "fixes": "D3+D4: extracted the 135-line inline 'Profile Creation & Skill Installation Workflow' section (with its duplicate 'Step 2/3/4' labels) into references/profile-creation-install.md as a clean Step 1-6 checklist; replaced inline with a summary + pointer. SKILL.md 513->398 lines (under 500 D4 threshold); code ratio 22.4%->15.3% (under 20% D3 target). D5: fixed three heading defects \u2014 renamed mislabeled '### Profile Naming Conventions' (systemd HERMES_HOME pitfall) to '### Systemd HERMES_HOME / -p Profile Override Pitfall'; removed an empty artifact heading '### Profile Naming' that preceded skillgrade; promoted the orphaned 'Profile Naming Conventions' bullet block to a proper top-level section. D8: added the new reference to the Support File Map with a When-to-read trigger. Scripts (close_wait_killer.py, gateway_cleanup.py) already passed D9 (argparse --help exits 0, --dry-run present).",
       "grounded": "manual+on-disk-verified",
       "at": "2026-07-25T05:03:00+00:00",
       "note": "Modified since last_run 2026-07-24T17:10:12Z (mtime 2026-07-24 18:58:34) so skip-condition NOT met; genuine D3/D4/D5 defects required grinding."
@@ -256,7 +258,7 @@
         "Copied shared spec-ocas-recovery.md into references/ (was a phantom reference from ocas-custodian's copy)",
         "Support File Map: added When-to-read rows for interactive-menu.md, cron-drive-fallback.md, mcp-drive-tooling.md, spec-ocas-recovery.md, okrs.md"
       ],
-      "manual_after": "50/50 — all 10 dims 5/5; on-disk verify: yaml OK, category present, 319 lines, code ratio 0%, 'when to read' present, 4 checkboxes, all 7 scripts --help exit 0",
+      "manual_after": "50/50 \u2014 all 10 dims 5/5; on-disk verify: yaml OK, category present, 319 lines, code ratio 0%, 'when to read' present, 4 checkboxes, all 7 scripts --help exit 0",
       "wc_lines": 319
     },
     {
@@ -278,7 +280,7 @@
       "date": "2026-09-12T05:47:21.344394+00:00",
       "before": "42/50 heuristic (manual: D3=3 [7559 tokens >5000], D4=4 [token proxy], D10=4 [missing 'When NOT to Use'], D6=4 [missing rationale for rigid rules], D9=1 [heuristic false neg - scripts --help worked but naive check failed])",
       "fixes": [
-        "D3/D4: extracted 9 inline sections into new reference files — Support File Map (4315 chars -> 3-line pointer), Backup Installation Merge (~100 lines -> 4-line summary + rationale), GW Restart Token Conflict (~70 lines -> brief summary), Dashboard Serving Wrong Profile (36 lines -> pointer), skillgrade Integration (22 lines -> pointer), GW crash-loop stale venv (14 lines -> pointer), Watchdog not-running fix (18 lines -> pointer), Router Models (14 lines -> pointer), Cross-Profile Editing (12 lines -> pointer). SKILL.md 430->188 lines, 7559->3468 tokens",
+        "D3/D4: extracted 9 inline sections into new reference files \u2014 Support File Map (4315 chars -> 3-line pointer), Backup Installation Merge (~100 lines -> 4-line summary + rationale), GW Restart Token Conflict (~70 lines -> brief summary), Dashboard Serving Wrong Profile (36 lines -> pointer), skillgrade Integration (22 lines -> pointer), GW crash-loop stale venv (14 lines -> pointer), Watchdog not-running fix (18 lines -> pointer), Router Models (14 lines -> pointer), Cross-Profile Editing (12 lines -> pointer). SKILL.md 430->188 lines, 7559->3468 tokens",
         "D6: added 'Why' rationale to Backup Merge, Google Workspace credentials, systemd profile pitfall, Profile Naming Conventions, and 3 gotchas (config protection, dashboard auth reset, gateway health check)",
         "D10: added full 'When NOT to Use' section with 7 exclusion categories",
         "D9: verified both scripts --help exit 0 (existing, was false negative in heuristic)"
@@ -391,9 +393,34 @@
       "grounded": "manual+on-disk+live-help-probes-on-all-8-scripts+git-diff-review",
       "at": "2026-10-27T17:55:06+00:00",
       "note": "Skip condition NOT met: SKILL.md mtime 2026-10-20 is AFTER last_run 2026-10-15, so the >=44 exemption did not apply. Target selection: lowest modified skill below 50/50 in ranking order after skipping unmodified ones (ocas-dispatch, util-apibuild, util-imessage-ingest)."
+    },
+    {
+      "skill": "ocas-lucid",
+      "score_before": "48/50 manual (D6=4 missing why explanations for rigid rules, D8=4 minimal support file map, D9=N/A no scripts)",
+      "score_after": "50/50 manual rubric (all 10 dimensions 5/5; runner heuristic 50/50 verified)",
+      "fixes": [
+        "D6: Added Why column to scoring signals table with per-signal rationale",
+        "D6: Added per-threshold rationale (>=5 write, 3-4 recirculate, <=2 skip)",
+        "D6: Added why for hibernation default (7 days), catchup_cap (40), exclude_self",
+        "D8: Expanded support file map with CHANGELOG.md, config.json, data/activity_model.jsonl, degraded-mode-execution",
+        "D9: Created tests/test_smoke.py (5 tests, all pass) and .github/workflows/ci.yml",
+        "Bumped version to 3.0.2, updated CHANGELOG.md"
+      ],
+      "grounded": "manual+on-disk+runner-score-50/50+5/5-tests-pass+frontmatter-valid+0-dead-refs",
+      "at": "2026-11-01T21:54:57+00:00"
+    },
+    {
+      "skill": "ocas-custodian",
+      "score_before": "49/50 runner (D3=4, 3508 tokens > 3500 threshold)",
+      "score_after": "50/50 runner (all 10 dimensions 5/5; 3498 tokens)",
+      "fixes": [
+        "D3: Trimmed intro paragraph (removed redundant clause) to reduce tokens from 3508 to 3498, crossing the 3500 threshold"
+      ],
+      "grounded": "manual+runner-score-50/50",
+      "at": "2026-11-01T22:33:32.996988+00:00"
     }
   ],
-  "current_target": "ocas-usercontext",
+  "current_target": null,
   "last_grind": {
     "skill": "ocas-sands",
     "score_before": "46/50",
