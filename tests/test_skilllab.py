@@ -431,5 +431,47 @@ class TestDestructivePreFilter(unittest.TestCase):
         self.assertIn("DROP TABLE", findings)
 
 
+class TestCorrectnessTestExecutionCaching(unittest.TestCase):
+    """Test LRU caching of unittest discover subprocess results in check_correctness."""
+
+    def test_check_tests_exec_cache_and_invalidation(self):
+        import critique_10khr_runner as runner
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tdir = os.path.join(tmpdir, "tests")
+            os.makedirs(tdir)
+            test_file = os.path.join(tdir, "test_sample.py")
+            with open(test_file, "w") as f:
+                f.write("import unittest\nclass T(unittest.TestCase):\n    def test_one(self): pass\n")
+
+            runner._check_tests_exec.cache_clear()
+            info_before = runner._check_tests_exec.cache_info()
+
+            # First run: cache miss
+            score1, findings1 = runner.check_correctness(tmpdir)
+            self.assertEqual(score1, 4)  # 5 - 1 (no CI)
+            info_after1 = runner._check_tests_exec.cache_info()
+            self.assertEqual(info_after1.misses, info_before.misses + 1)
+            self.assertEqual(info_after1.hits, info_before.hits)
+
+            # Second run: cache hit
+            score2, findings2 = runner.check_correctness(tmpdir)
+            self.assertEqual(score2, score1)
+            info_after2 = runner._check_tests_exec.cache_info()
+            self.assertEqual(info_after2.hits, info_after1.hits + 1)
+            self.assertEqual(info_after2.misses, info_after1.misses)
+
+            # Modify test file to fail and update mtime: cache invalidation / new miss
+            import time
+            time.sleep(0.01)
+            with open(test_file, "w") as f:
+                f.write("import unittest\nclass T(unittest.TestCase):\n    def test_fail(self): self.fail('intentional')\n")
+
+            score3, findings3 = runner.check_correctness(tmpdir)
+            self.assertEqual(score3, 2)  # 5 - 2 (tests fail) - 1 (no CI)
+            self.assertTrue(any("tests FAIL" in item for item in findings3))
+            info_after3 = runner._check_tests_exec.cache_info()
+            self.assertEqual(info_after3.misses, info_after2.misses + 1)
+
+
 if __name__ == "__main__":
     unittest.main()
