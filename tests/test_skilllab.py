@@ -348,6 +348,37 @@ class TestCronVerify(unittest.TestCase):
             self.assertEqual(chk.get("D5"), "OK")
             self.assertIn("wc_lines", chk)
 
+    def test_ondisk_check_d9_script_handling(self):
+        """Verify ondisk_check correctly filters and executes scripts via runner caches."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_md = os.path.join(tmpdir, "SKILL.md")
+            with open(skill_md, "w") as f:
+                f.write("---\nname: test-d9\ndescription: test d9\n---\n# T\n- [ ] item\n")
+            sd = os.path.join(tmpdir, "scripts")
+            os.makedirs(sd)
+
+            # 1. Non-CLI helper (should be skipped)
+            with open(os.path.join(sd, "helper.py"), "w") as f:
+                f.write("def helper(): pass\n")
+
+            # 2. Test script (should be skipped)
+            with open(os.path.join(sd, "test_foo.py"), "w") as f:
+                f.write("def test_foo(): pass\n")
+
+            # 3. Valid CLI script (passes --help)
+            with open(os.path.join(sd, "run.py"), "w") as f:
+                f.write("import sys\nif __name__ == '__main__':\n    sys.exit(0 if '--help' in sys.argv else 1)\n")
+
+            chk = cron_verify.ondisk_check("test-d9", skill_md, runner)
+            self.assertEqual(chk.get("D9"), "OK (all exit 0)")
+
+            # 4. Broken CLI script (fails --help)
+            with open(os.path.join(sd, "broken.py"), "w") as f:
+                f.write("import sys\nif __name__ == '__main__':\n    sys.exit(1)\n")
+
+            chk2 = cron_verify.ondisk_check("test-d9", skill_md, runner)
+            self.assertIn("broken.py", chk2.get("D9", ""))
+
 
 class TestScriptHelp(unittest.TestCase):
     """D9: every bundled script answers --help with exit 0."""
