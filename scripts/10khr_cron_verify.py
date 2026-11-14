@@ -182,11 +182,12 @@ def ondisk_check(skill_name, skill_path, runner):
     out["D5"] = "OK" if has_cb else "NO checklist (main or refs)"
 
     # D9: every CLI script --help must exit 0
-    # Performance & correctness optimization: Combine _can_send safety guard with
-    # runner's non-CLI and test entrypoint filtering to avoid wasteful subprocess spawning
-    # (~50ms per non-CLI script) and eliminate false-positive failure reports on helper modules,
-    # while guaranteeing 100% safety against outbound side-effects. Direct os.listdir
-    # with try/except eliminates redundant os.path.isdir stat call.
+    # Reuse the runner's (path, mtime)-keyed cache helpers
+    # (_inspect_script_static, _check_script_help_exec) so scripts are not
+    # re-read and --help subprocesses are not re-spawned on every pass.
+    # Matches scripts/check_scripts_help in critique_10khr_runner.py:
+    # empty/non_cli modules are skipped, test/safe_outbound scripts pass,
+    # broken_outbound scripts are reported, inspectable scripts execute --help.
     sd = os.path.join(d, "scripts")
     try:
         scripts = sorted(f for f in os.listdir(sd) if f.endswith((".py", ".sh")))
@@ -198,30 +199,19 @@ def ondisk_check(skill_name, skill_path, runner):
     for s in scripts:
         sp = os.path.join(sd, s)
         try:
-            with open(sp, encoding="utf-8", errors="ignore") as f:
-                src = f.read()
+            mtime = os.path.getmtime(sp)
         except OSError:
-            src = ""
-        if not src:
             continue
-        # 1. Outbound safety check: pass pre-read `src` to avoid redundant file open/read
-        if _can_send(src):
+        status, detail = runner._inspect_script_static(sp, mtime)
+        if status in ("empty", "non_cli"):
             continue
-        # 2. Skip test entrypoints and non-CLI modules to avoid slow & false-positive --help checks
-        if runner._is_test_entrypoint(src):
+        if status in ("test", "safe_outbound"):
             continue
-        if not runner._is_cli_entrypoint(src):
+        if status == "broken_outbound":
+            miss.append(detail or s)
             continue
-        if runner._outbound_capable(s, src):
-            if not runner._flag_safe(s, src):
-                miss.append(s)
-            continue
-
-        try:
-            cmd = ["bash", sp, "--help"] if s.endswith(".sh") else [sys.executable, sp, "--help"]
-            rc = subprocess.run(cmd, input="", capture_output=True, text=True, timeout=30).returncode
-        except Exception:
-            rc = -1
+        # status == "inspectable": cached --help execution
+        rc = runner._check_script_help_exec(sp, mtime)
         if rc != 0:
             miss.append(s)
 
