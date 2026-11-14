@@ -437,11 +437,11 @@ class TestDestructivePreFilter(unittest.TestCase):
                 f.write('import os\nos.system("rm -rf /")\n')
             mtime = os.path.getmtime(bad_script)
 
-            hits1 = runner._check_script_destructive(bad_script, mtime)
+            hits1 = runner._check_destructive_hits(bad_script, mtime)
             self.assertEqual(hits1, ("rm -rf in destroy.py",))
 
             # Second call hits cache
-            hits2 = runner._check_script_destructive(bad_script, mtime)
+            hits2 = runner._check_destructive_hits(bad_script, mtime)
             self.assertEqual(hits2, hits1)
 
             # Clean script returns empty tuple
@@ -449,7 +449,7 @@ class TestDestructivePreFilter(unittest.TestCase):
             with open(clean_script, "w") as f:
                 f.write('print("hello world")\n')
             clean_mtime = os.path.getmtime(clean_script)
-            hits_clean = runner._check_script_destructive(clean_script, clean_mtime)
+            hits_clean = runner._check_destructive_hits(clean_script, clean_mtime)
             self.assertEqual(hits_clean, ())
 
 
